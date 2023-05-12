@@ -6,3 +6,4 @@ services:
     container_name: booth-update-checker
     volumes:
       - ./booth-update-checker:/root/booth-update-checker/version
+    restart: unless-stopped
