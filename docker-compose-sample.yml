@@ -1,0 +1,8 @@
+version: "3"
+
+services:
+  booth-update-checker:
+    build: .
+    container_name: booth-update-checker
+    volumes:
+      - ./booth-update-checker:/root/booth-update-checker/version
