@@ -4,8 +4,8 @@ from bs4 import BeautifulSoup
 from time import sleep
 
 
-def parser(order_num, cookie):
-    url = (f'https://accounts.booth.pm/orders/{order_num}')
+def crawling(order_num, cookie):
+    url = f'https://accounts.booth.pm/orders/{order_num}'
     response = requests.get(url=url, cookies=cookie)
     html = response.content
     soup = BeautifulSoup(html, "html.parser")
@@ -28,27 +28,19 @@ def file_save(version_file_path, download_url_list, order_num):
 
 def discord_webhook(webhook_url, content, name):
     data = {
-        "username" : "부스 업데이트 체크",
-        "content" : (f'{name} {content}')
-    }
-    requests.post(webhook_url, json=data)
-
-
-def discord_webhook(webhook_url, content):
-    data = {
-        "username" : "부스 업데이트 체크",
-        "content" : content
+        "username": "부스 업데이트 체크",
+        "content": f'{name} {content}'
     }
     requests.post(webhook_url, json=data)
 
 
 def update_cheker(name, url, order_num, cookie, webhook_url):
-    download_url_list = parser(order_num, cookie)
-    if download_url_list == []:
-        result = "BOOTH no response"
-        discord_webhook(webhook_url, result)
+    download_url_list = crawling(order_num, cookie)
+    if not download_url_list:
+        result = "응답 없음"
+        discord_webhook(webhook_url, result, "부스")
     else:
-        version_file_path = (f'./version/{order_num}.txt')
+        version_file_path = f'./version/{order_num}.txt'
         if os.path.exists(version_file_path):
             with open(version_file_path) as f:
                 version_list = f.readlines()
@@ -56,7 +48,7 @@ def update_cheker(name, url, order_num, cookie, webhook_url):
             print(f'LOCAL : {version_list}')
             print(f'BOOTH : {download_url_list}')
             if sorted(version_list) != sorted(download_url_list):
-                result = (f'업데이트 있음 \n {url}')
+                result = f'업데이트 있음 \n {url}'
                 print(f'{name} 업데이트 있음')
                 discord_webhook(webhook_url, result, name)
             else:
@@ -91,4 +83,3 @@ if __name__ == "__main__":
         # 갱신 대기
         print("waiting for refresh")
         sleep(refresh_interval)
-        
