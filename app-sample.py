@@ -28,20 +28,42 @@ def file_save(version_file_path, download_url_list, order_num):
     print(f'{order_num} version file saved')
 
 
-def webhook(url, content):
+def webhook(webhook_url, name, url, version_list, download_url_list):
+    fields = list()
+    fields.append({"name": "이름", "value": name})
+    fields.append({"name": "URL", "value": url})
+    fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
+    fields.append({"name": "BOOTH", "value": str(download_url_list), "inline": True})
     payload = {
-        "username": "BOOTH 업데이트 체크",
-        "content": content
+        "content": "@here",
+        "embeds": [
+            {
+                "title": "BOOTH 업데이트 발견",
+                "color": 65280,
+                "fields": fields
+            }
+        ]  
     }
-    requests.post(url, json=payload)
+    requests.post(webhook_url, json=payload)
+
+def error_webhook(webhook_url):
+    payload = {
+        "content": "@here",
+        "embeds": [
+            {
+                "title": "BOOTH 응답 없음",
+                "color": 16711680
+            }
+        ]  
+    }
+    requests.post(webhook_url, json=payload)
 
 
 def update_cheker(name, url, order_num, cookie, webhook_url):
     download_url_list = crawling(order_num, cookie)
     if not download_url_list:
         print(f'BOOTH 응답 없음')
-        result = "BOOTH 응답 없음"
-        webhook(webhook_url, result)
+        error_webhook(webhook_url)
     else:
         version_file_path = f'./version/{order_num}.txt'
         if os.path.exists(version_file_path):
@@ -52,9 +74,8 @@ def update_cheker(name, url, order_num, cookie, webhook_url):
             print(f'LOCAL : {version_list}')
             print(f'BOOTH : {download_url_list}')
             if sorted(version_list) != sorted(download_url_list):
-                result = f'{name} 업데이트 발견\nLOCAL : {version_list}\nBOOTH : {download_url_list}\n{url}'
                 print(f'{name} 업데이트 발견')
-                webhook(webhook_url, result)
+                webhook(webhook_url, name, url, version_list, download_url_list)
                 file_save(version_file_path, download_url_list, order_num)
             else:
                 print(f'{name} 업데이트 없음')
@@ -66,7 +87,7 @@ def update_cheker(name, url, order_num, cookie, webhook_url):
 if __name__ == "__main__":
     # 계정
     booth_cookie = {"_plaza_session_nktz7u": "BOOTH 세션 쿠키"}
-    webhook_url = "Webhook URL"
+    discord_webhook_url = "Webhook URL"
 
     # 갱신 간격 (초)
     refresh_interval = 600
@@ -76,13 +97,13 @@ if __name__ == "__main__":
         booth_name = "아바타_0"
         booth_url = "BOOTH 상품 페이지 URL"
         booth_order_number = "BOOTH 주문 번호"
-        update_cheker(booth_name, booth_url, booth_order_number, booth_cookie, webhook_url)
+        update_cheker(booth_name, booth_url, booth_order_number, booth_cookie, discord_webhook_url)
 
         # 아바타_1
         booth_name = "아바타_1"
         booth_url = "BOOTH 상품 페이지 URL"
         booth_order_number = "BOOTH 주문 번호"
-        update_cheker(booth_name, booth_url, booth_order_number, booth_cookie, webhook_url)
+        update_cheker(booth_name, booth_url, booth_order_number, booth_cookie, discord_webhook_url)
 
         # 갱신 대기
         print("waiting for refresh")
