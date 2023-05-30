@@ -1,0 +1,13 @@
+{
+    "session-cookie": "",
+    "discord-webhook-url": "",
+
+    "products":
+    [
+        {
+            "booth-product-name": "",
+            "booth-product-url": "",
+            "booth-order-number": ""
+        }
+    ]
+}

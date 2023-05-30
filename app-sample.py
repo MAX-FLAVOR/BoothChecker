@@ -1,9 +1,11 @@
 import os.path
 import re
 import requests
+import simdjson
 from bs4 import BeautifulSoup
 from time import sleep
 
+jsonString = "" 
 
 def crawling(order_num, cookie):
     url = f'https://accounts.booth.pm/orders/{order_num}'
@@ -85,26 +87,24 @@ def update_cheker(name, url, order_num, cookie, webhook_url):
 
 
 if __name__ == "__main__":
+    file = open('checklist.json')
+    jsonString = simdjson.load(file)
+
     # 계정
-    booth_cookie = {"_plaza_session_nktz7u": "BOOTH 세션 쿠키"}
-    discord_webhook_url = "Webhook URL"
+    booth_cookie = {"_plaza_session_nktz7u": jsonString['session-cookie']}
+    discord_webhook_url = jsonString['discord-webhook-url']
 
     # 갱신 간격 (초)
     refresh_interval = 600
     os.makedirs("./version")
 
     while True:
-        # 아바타_0
-        booth_name = "아바타_0"
-        booth_url = "BOOTH 상품 페이지 URL"
-        booth_order_number = "BOOTH 주문 번호"
-        update_cheker(booth_name, booth_url, booth_order_number, booth_cookie, discord_webhook_url)
-
-        # 아바타_1
-        booth_name = "아바타_1"
-        booth_url = "BOOTH 상품 페이지 URL"
-        booth_order_number = "BOOTH 주문 번호"
-        update_cheker(booth_name, booth_url, booth_order_number, booth_cookie, discord_webhook_url)
+        for product in jsonString['products']:     
+            booth_name = product['booth-product-name']
+            booth_url = product['booth-product-url']
+            booth_order_number = product['booth-order-number']
+            
+            update_cheker(booth_name, booth_url, booth_order_number, booth_cookie, discord_webhook_url)
 
         # 갱신 대기
         print("waiting for refresh")
