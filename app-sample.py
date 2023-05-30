@@ -21,7 +21,7 @@ def crawling(order_num, cookie):
 
 
 def file_save(version_file_path, download_url_list, order_num):
-    f = open(version_file_path, "w")
+    f = open(version_file_path, "w+")
     for result in download_url_list:
         f.write(result + "\n")
     f.close()
@@ -91,6 +91,7 @@ if __name__ == "__main__":
 
     # 갱신 간격 (초)
     refresh_interval = 600
+    os.makedirs("./version")
 
     while True:
         # 아바타_0
