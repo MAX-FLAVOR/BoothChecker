@@ -1,3 +1,8 @@
 app.py
 docker-compose.yml
 /version/
+checklist.json
+
+__pycache__/
+
+*.code-workspace
