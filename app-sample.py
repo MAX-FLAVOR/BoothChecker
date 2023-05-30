@@ -28,6 +28,13 @@ def file_save(version_file_path, download_url_list, order_num):
         f.write(result + "\n")
     f.close()
     print(f'{order_num} version file saved')
+    
+def createFolder(directory):
+    try:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+    except OSError:
+        print ('Error: Creating directory. ' +  directory)
 
 
 def webhook(webhook_url, name, url, version_list, download_url_list):
@@ -96,7 +103,7 @@ if __name__ == "__main__":
 
     # 갱신 간격 (초)
     refresh_interval = 600
-    os.makedirs("./version")
+    createFolder("./version")
 
     while True:
         for product in jsonString['products']:     
