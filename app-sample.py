@@ -1,7 +1,6 @@
 import os.path
 import re
 import requests
-import simdjson
 from bs4 import BeautifulSoup
 from time import sleep
 
