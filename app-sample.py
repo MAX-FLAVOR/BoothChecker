@@ -143,8 +143,8 @@ def init_update_check(name, url, order_num, cookie, webhook_url):
     # add webhook
     
     # delete all of 'marked_as'
-    # for local_file in version_json['files'].keys():
-    #     remove_element_mark(version_json['files'][local_file])
+    for local_file in version_json['files'].keys():
+        remove_element_mark(version_json['files'][local_file])
     
     version_json['short-list'] = download_short_list
     
@@ -275,7 +275,11 @@ def element_mark(root, mark_as):
     for file in files.keys():
         element_mark(root['files'][file], mark_as)
         
-def remove_element_mark(root): 
+def remove_element_mark(root):
+    if root['mark_as'] == 2:
+        del root
+        return
+    
     del root['mark_as']
 
     files = root.get('files', None)
