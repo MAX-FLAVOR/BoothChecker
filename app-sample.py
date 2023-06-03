@@ -22,27 +22,37 @@ from unitypackage_extractor.extractor import extractPackage
 # download_url_list
 #   - [download_number, filename]
 
-def crawling(order_num, cookie, shortlist = None):
+def crawling(order_num, products, cookie, shortlist = None):
     url = f'https://accounts.booth.pm/orders/{order_num}'
     response = requests.get(url=url, cookies=cookie)
     html = response.content
     
     soup = BeautifulSoup(html, "html.parser")
-    divs = soup.find_all("div", class_="legacy-list-item__center")
-    download_url_list = list()
     
-    for div in divs:
-        download_link = div.select_one("a.nav-reverse")
-        filename_div = div.select_one("div.u-flex-1")
+    product_divs = soup.find_all("div", class_="sheet sheet--p400 mobile:pt-[13px] mobile:px-16 mobile:pb-8")
+    for product_div in product_divs:
+        product_link = product_div.select_one("a")
+        product_number = product_link.get("href")
+        product_number = re.sub(r'[^0-9]', '', product_number)
         
-        href = download_link.get("href")
-        filename = filename_div.get_text()
+        if products is not None and product_number not in products:
+            continue
+        
+        divs = product_div.select("div.legacy-list-item__center")
+        download_url_list = list()
+        
+        for div in divs:
+            download_link = div.select_one("a.nav-reverse")
+            filename_div = div.select_one("div.u-flex-1")
+            
+            href = download_link.get("href")
+            filename = filename_div.get_text()
 
-        href = re.sub(r'[^0-9]', '', href)
-        download_url_list.append([href, filename])
-        
-        if not shortlist is None:
-            shortlist.append(href)
+            href = re.sub(r'[^0-9]', '', href)
+            download_url_list.append([href, filename])
+            
+            if not shortlist is None:
+                shortlist.append(href)
             
     return download_url_list
 
@@ -107,9 +117,9 @@ def error_webhook(webhook_url):
     }
     requests.post(webhook_url, json=payload)
 
-def init_update_check(name, url, order_num, cookie, webhook_url):
+def init_update_check(name, url, order_num, products, cookie, webhook_url):
     download_short_list = list()
-    download_url_list = crawling(order_num, cookie, download_short_list)
+    download_url_list = crawling(order_num, products, cookie, download_short_list)
 
     version_file_path = f'./version/{order_num}.json'
     if not os.path.exists(version_file_path):
@@ -311,8 +321,9 @@ if __name__ == "__main__":
             booth_name = product['booth-product-name']
             booth_url = product['booth-product-url']
             booth_order_number = product['booth-order-number']
+            booth_products = product.get('booth-check-only')
             
-            init_update_check(booth_name, booth_url, booth_order_number, booth_cookie, discord_webhook_url)
+            init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url)
 
         # 갱신 대기
         print("waiting for refresh")
