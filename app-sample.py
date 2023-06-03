@@ -82,7 +82,7 @@ def webhook(webhook_url, name, url, version_list, download_url_list):
     fields.append({"name": "이름", "value": name})
     fields.append({"name": "URL", "value": url})
     fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
-    fields.append({"name": "BOOTH", "value": str(download_url_list[0]), "inline": True})
+    fields.append({"name": "BOOTH", "value": str(download_url_list), "inline": True})
     payload = {
         "content": "@here",
         "embeds": [
@@ -130,21 +130,22 @@ def init_update_check(name, url, order_num, cookie, webhook_url):
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2)
     
-    for url in download_url_list: 
+    for item in download_url_list: 
         # download stuff
-        download_path = f'./download/{url[1]}'
+        download_path = f'./download/{item[1]}'
         
-        print(f'downloading {url[0]} to {download_path}')
-        download_item(url[0], download_path, cookie)
+        print(f'downloading {item[0]} to {download_path}')
+        download_item(item[0], download_path, cookie)
         
         print('parsing its structure')
-        init_file_process(download_path, url[1], version_json)
+        init_file_process(download_path, item[1], version_json)
         
     # add webhook
+    webhook(webhook_url, name, url, local_list, download_short_list)
     
     # delete all of 'marked_as'
-    # for local_file in version_json['files'].keys():
-    #     remove_element_mark(version_json['files'][local_file])
+    for local_file in version_json['files'].keys():
+        remove_element_mark(version_json['files'][local_file])
     
     version_json['short-list'] = download_short_list
     
@@ -275,7 +276,11 @@ def element_mark(root, mark_as):
     for file in files.keys():
         element_mark(root['files'][file], mark_as)
         
-def remove_element_mark(root): 
+def remove_element_mark(root):
+    if root['mark_as'] == 2:
+        del root
+        return
+    
     del root['mark_as']
 
     files = root.get('files', None)
