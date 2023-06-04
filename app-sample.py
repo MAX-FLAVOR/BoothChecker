@@ -22,27 +22,41 @@ from unitypackage_extractor.extractor import extractPackage
 # download_url_list
 #   - [download_number, filename]
 
-def crawling(order_num, cookie, shortlist = None):
+def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None):
     url = f'https://accounts.booth.pm/orders/{order_num}'
     response = requests.get(url=url, cookies=cookie)
     html = response.content
     
-    soup = BeautifulSoup(html, "html.parser")
-    divs = soup.find_all("div", class_="legacy-list-item__center")
     download_url_list = list()
+    soup = BeautifulSoup(html, "html.parser")
     
-    for div in divs:
-        download_link = div.select_one("a.nav-reverse")
-        filename_div = div.select_one("div.u-flex-1")
+    product_divs = soup.find_all("div", class_="sheet sheet--p400 mobile:pt-[13px] mobile:px-16 mobile:pb-8")
+    for product_div in product_divs:
+        product_link = product_div.select_one("a")
+        product_url = product_link.get("href")
+        product_number = re.sub(r'[^0-9]', '', product_url)
         
-        href = download_link.get("href")
-        filename = filename_div.get_text()
+        if product_only is not None and product_number not in product_only:
+            continue
+        
+        thumb_link = product_div.select_one("img")
+        thumb_url = thumb_link.get("src")
+        if not thumblist is None:
+            thumblist.append(thumb_url)
+        
+        divs = product_div.select("div.legacy-list-item__center")
+        for div in divs:
+            download_link = div.select_one("a.nav-reverse")
+            filename_div = div.select_one("div.u-flex-1")
+            
+            href = download_link.get("href")
+            filename = filename_div.get_text()
 
-        href = re.sub(r'[^0-9]', '', href)
-        download_url_list.append([href, filename])
-        
-        if not shortlist is None:
-            shortlist.append(href)
+            href = re.sub(r'[^0-9]', '', href)
+            download_url_list.append([href, filename])
+            
+            if not shortlist is None:
+                shortlist.append(href)
             
     return download_url_list
 
@@ -52,6 +66,23 @@ def download_item(download_number, filepath, cookie):
     
     response = requests.get(url=url, cookies=cookie)
     open(filepath, "wb").write(response.content)
+    
+    
+def crawling_product(url):
+    response = requests.get(url)
+    html = response.content
+    
+    soup = BeautifulSoup(html, "html.parser")
+    author_div = soup.find("a", class_="flex gap-4 items-center no-underline preserve-half-leading !text-current typography-16 w-fit")
+    # None: private store
+    if author_div is None:
+        return None
+    
+    author_image = author_div.select_one("img")
+    author_image_url = author_image.get("src")
+    author_name = author_image.get("alt")
+    
+    return [author_image_url, author_name]
     
 
 def createVersionFile(version_file_path, order_num):
@@ -77,19 +108,39 @@ def createFolder(directory):
         print ('Error: Creating directory. ' +  directory)
 
 
-def webhook(webhook_url, name, url, version_list, download_url_list):
+def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb):
     fields = list()
-    fields.append({"name": "이름", "value": name})
-    fields.append({"name": "URL", "value": url})
+    # fields.append({"name": "이름", "value": name})
+    # fields.append({"name": "URL", "value": url})
     fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
-    fields.append({"name": "BOOTH", "value": str(download_url_list), "inline": True})
+    fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
+    
+    if author_info is not None:
+        author_icon = author_info[0]
+        author_name = author_info[1] + " "
+    else:
+        author_name = ""
+        author_icon = "" 
+    
     payload = {
         "content": "@here",
         "embeds": [
             {
-                "title": "BOOTH 업데이트 발견",
+                "title": name,
                 "color": 65280,
-                "fields": fields
+                "fields": fields,
+                "author": {
+                    "name": author_name + 'BOOTH 업데이트 발견',
+                    "icon_url": author_icon
+                },
+                "footer": {
+                    "icon_url": "https://booth.pm/static-images/pwa/icon_size_128.png",
+                    "text": "BOOTH.pm"
+                },
+                "thumbnail": {
+                    "url": thumb
+                },
+                "url": url
             }
         ]  
     }
@@ -107,9 +158,10 @@ def error_webhook(webhook_url):
     }
     requests.post(webhook_url, json=payload)
 
-def init_update_check(name, url, order_num, cookie, webhook_url):
+def init_update_check(name, url, order_num, products, cookie, webhook_url):
     download_short_list = list()
-    download_url_list = crawling(order_num, cookie, download_short_list)
+    thumblist = list()
+    download_url_list = crawling(order_num, products, cookie, download_short_list, thumblist)
 
     version_file_path = f'./version/{order_num}.json'
     if not os.path.exists(version_file_path):
@@ -121,7 +173,7 @@ def init_update_check(name, url, order_num, cookie, webhook_url):
     
     local_list = version_json['short-list'] 
         
-    if length_hint(local_list) > 0 and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]:
+    if length_hint(local_list) > 0 and length_hint(download_short_list) > 0 and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]:
         return
              
     print(f'something has changed on {order_num}')
@@ -141,7 +193,8 @@ def init_update_check(name, url, order_num, cookie, webhook_url):
         init_file_process(download_path, item[1], version_json)
         
     # add webhook
-    webhook(webhook_url, name, url, local_list, download_short_list)
+    author_info = crawling_product(url)
+    webhook(webhook_url, url, name, local_list, download_short_list, author_info, thumblist[0])
     
     # delete all of 'marked_as'
     for local_file in version_json['files'].keys():
@@ -311,8 +364,9 @@ if __name__ == "__main__":
             booth_name = product['booth-product-name']
             booth_url = product['booth-product-url']
             booth_order_number = product['booth-order-number']
+            booth_products = product.get('booth-check-only')
             
-            init_update_check(booth_name, booth_url, booth_order_number, booth_cookie, discord_webhook_url)
+            init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url)
 
         # 갱신 대기
         print("waiting for refresh")
