@@ -27,6 +27,7 @@ def crawling(order_num, products, cookie, shortlist = None):
     response = requests.get(url=url, cookies=cookie)
     html = response.content
     
+    download_url_list = list()
     soup = BeautifulSoup(html, "html.parser")
     
     product_divs = soup.find_all("div", class_="sheet sheet--p400 mobile:pt-[13px] mobile:px-16 mobile:pb-8")
@@ -39,8 +40,6 @@ def crawling(order_num, products, cookie, shortlist = None):
             continue
         
         divs = product_div.select("div.legacy-list-item__center")
-        download_url_list = list()
-        
         for div in divs:
             download_link = div.select_one("a.nav-reverse")
             filename_div = div.select_one("div.u-flex-1")
@@ -131,7 +130,7 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
     
     local_list = version_json['short-list'] 
         
-    if length_hint(local_list) > 0 and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]:
+    if length_hint(local_list) > 0 and length_hint(download_short_list) > 0 and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]:
         return
              
     print(f'something has changed on {order_num}')
