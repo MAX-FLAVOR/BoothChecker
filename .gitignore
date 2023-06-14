@@ -1,7 +1,3 @@
-app.py
-docker-compose.yml
-checklist.json
-
 __pycache__/
 /download/
 /process/
