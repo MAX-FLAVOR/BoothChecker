@@ -112,8 +112,6 @@ def createFolder(directory):
 
 def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb):
     fields = list()
-    # fields.append({"name": "이름", "value": name})
-    # fields.append({"name": "URL", "value": url})
     fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
     fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
     
@@ -122,7 +120,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
         author_name = author_info[1] + " "
     else:
         author_name = ""
-        author_icon = "" 
+        author_icon = ""
     
     payload = {
         "content": "@here",
@@ -158,7 +156,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
                 "description": "BOOTH Download Changelog",
                 "filename": f'{name}.png'
             }
-        ]  
+        ] 
     }
 
     # This convert dict to string with keep double quote like: "content": "@here"
@@ -312,7 +310,6 @@ def get_offset(level, count):
 
 
 json_level = []
-
 def init_file_process(input_path, filename, version_json):
     json_level.append(filename)
     
