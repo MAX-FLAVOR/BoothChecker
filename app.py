@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 from operator import length_hint
 # from jsonpointer import resolve_pointer
 from unitypackage_extractor.extractor import extractPackage
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 # mark_as
 #   - 0: Nothing
@@ -142,10 +143,35 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
                     "url": thumb
                 },
                 "url": url
+            },
+            {
+                "title": "CHANGELOG",
+                "color": 65280,
+                "image": {
+                    "url": f'attachment://{name}.png'
+                }
+            }
+        ],
+        "attachments": [
+            {
+                "id": 0,
+                "description": "BOOTH Download Changelog",
+                "filename": f'{name}.png'
             }
         ]  
     }
-    requests.post(webhook_url, json=payload)
+
+    # This convert dict to string with keep double quote like: "content": "@here"
+    payload_str = simdjson.dumps(payload)
+    
+    mpe = MultipartEncoder(
+        fields = {
+            "payload_json": payload_str,  
+            'files[0]': (f'{name}.png', open(f'{name}.png', 'rb'), 'image/png')
+        }
+    )
+    
+    requests.post(webhook_url, data=mpe, headers={'Content-Type': mpe.content_type})
 
 def error_webhook(webhook_url):
     payload = {
