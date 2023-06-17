@@ -7,9 +7,11 @@ import requests
 import simdjson
 from bs4 import BeautifulSoup
 from time import sleep
+from PIL import Image, ImageDraw, ImageFont
 from operator import length_hint
 # from jsonpointer import resolve_pointer
 from unitypackage_extractor.extractor import extractPackage
+from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 # mark_as
 #   - 0: Nothing
@@ -110,8 +112,6 @@ def createFolder(directory):
 
 def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb):
     fields = list()
-    # fields.append({"name": "이름", "value": name})
-    # fields.append({"name": "URL", "value": url})
     fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
     fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
     
@@ -120,7 +120,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
         author_name = author_info[1] + " "
     else:
         author_name = ""
-        author_icon = "" 
+        author_icon = ""
     
     payload = {
         "content": "@here",
@@ -141,10 +141,35 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
                     "url": thumb
                 },
                 "url": url
+            },
+            {
+                "title": "CHANGELOG",
+                "color": 65280,
+                "image": {
+                    "url": f'attachment://{name}.png'
+                }
             }
-        ]  
+        ],
+        "attachments": [
+            {
+                "id": 0,
+                "description": "BOOTH Download Changelog",
+                "filename": f'{name}.png'
+            }
+        ] 
     }
-    requests.post(webhook_url, json=payload)
+
+    # This convert dict to string with keep double quote like: "content": "@here"
+    payload_str = simdjson.dumps(payload)
+    
+    mpe = MultipartEncoder(
+        fields = {
+            "payload_json": payload_str,  
+            'files[0]': (f'{name}.png', open(f'{name}.png', 'rb'), 'image/png')
+        }
+    )
+    
+    requests.post(webhook_url, data=mpe, headers={'Content-Type': mpe.content_type})
 
 def error_webhook(webhook_url):
     payload = {
@@ -192,6 +217,21 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
         print('parsing its structure')
         init_file_process(download_path, item[1], version_json)
         
+    # create image from 'files' tree
+    global current_string, current_level, current_count, highest_level
+    
+    current_string = ""
+    current_level = 0
+    current_count = 0
+    highest_level = 0
+    get_files_str(version_json)
+    
+    offset = get_offset(highest_level, current_count)
+    img = make_image(1024, offset[1])
+    print_img(img)
+    # img = img.resize(size=(2048, offset[1]))
+    img.save(f'{name}.png')
+    
     # add webhook
     author_info = crawling_product(url)
     webhook(webhook_url, url, name, local_list, download_short_list, author_info, thumblist[0])
@@ -208,9 +248,68 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
     
     file.close()
     
+font = ImageFont.truetype('NanumGothic.ttf', size=16)
+font_color = 'rgb(255, 255, 255)'
+def make_image(x, y):
+    image = Image.new('RGB', (x, y), color = 'rgb(54, 57, 63)')
+    return image
+
+current_string = ""
+current_level = 0
+current_count = 0
+highest_level = 0
+def get_files_str(root):
+    global current_string, current_level, current_count, highest_level
+    
+    if highest_level < current_level:
+        highest_level = current_level
+    
+    files = root.get('files', None)
+    if files is None:
+        return
+    
+    current_level += 1
+    
+    for file in files.keys():
+        filetree_str = ""
+
+        for loop in range(0, current_level - 1):
+            filetree_str += '        '
+
+        symbol = ''
+        if root['files'][file]['mark_as'] == 1:
+            # symbol = '📝'
+            symbol = '(Added)'
+        elif root['files'][file]['mark_as'] == 2:
+            # symbol = '⛔'
+            symbol = '(Deleted)'
+        elif root['files'][file]['mark_as'] == 3:
+            # symbol = '♺'
+            symbol = '(Changed)'
+
+        current_count += 1
+        filetree_str += f'{file} {symbol}'
+        current_string += filetree_str + '\n'
+        
+        get_files_str(root['files'][file])
+        
+    current_level -= 1
+    
+    
+def print_img(img):
+    global current_string
+    
+    draw = ImageDraw.Draw(img)
+    draw.text((0, 0), current_string, font=font, fill=font_color)
+
+
+def get_offset(level, count):
+    x_offset = 64 * level
+    y_offset = 20 * count
+    return (x_offset, y_offset)
+
 
 json_level = []
-
 def init_file_process(input_path, filename, version_json):
     json_level.append(filename)
     
