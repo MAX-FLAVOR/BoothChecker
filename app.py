@@ -24,6 +24,8 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 # download_url_list
 #   - [download_number, filename]
 
+changelog_img_path = 'changelog_temp.png'
+
 def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None):
     url = f'https://accounts.booth.pm/orders/{order_num}'
     response = requests.get(url=url, cookies=cookie)
@@ -146,7 +148,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
                 "title": "CHANGELOG",
                 "color": 65280,
                 "image": {
-                    "url": f'attachment://{name}.png'
+                    "url": f'attachment://{changelog_img_path}'
                 }
             }
         ],
@@ -154,7 +156,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
             {
                 "id": 0,
                 "description": "BOOTH Download Changelog",
-                "filename": f'{name}.png'
+                "filename": changelog_img_path
             }
         ] 
     }
@@ -165,7 +167,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
     mpe = MultipartEncoder(
         fields = {
             "payload_json": payload_str,  
-            'files[0]': (f'{name}.png', open(f'{name}.png', 'rb'), 'image/png')
+            'files[0]': (changelog_img_path, open(changelog_img_path, 'rb'), 'image/png')
         }
     )
     
@@ -230,11 +232,13 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
     img = make_image(1024, offset[1])
     print_img(img)
     # img = img.resize(size=(2048, offset[1]))
-    img.save(f'{name}.png')
+    img.save(changelog_img_path)
     
     # add webhook
     author_info = crawling_product(url)
     webhook(webhook_url, url, name, local_list, download_short_list, author_info, thumblist[0])
+    
+    os.remove(changelog_img_path)
     
     # delete all of 'marked_as'
     for local_file in version_json['files'].keys():
