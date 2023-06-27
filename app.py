@@ -338,39 +338,28 @@ def init_file_process(input_path, filename, version_json):
         
     process_path = f'./process/{pathstr}'
     zip_type = try_extract(input_path, filename, process_path)
-    if zip_type > 0 or os.path.isdir(process_path):
-        json = version_json.get('files', {})
-        pre_json = json
-        for entry in json_level:
-            # check entry exists in version_json first
-            pre_json = json
-            json = json.get(entry, None)
-            
-            if json is None:
-                pre_json[entry] = {'hash': filehash, 'mark_as': 1, 'files': {}}
-            elif zip_type > 0 and not os.path.isdir(process_path):
-                pre_json[entry]['mark_as'] = 0 if pre_json[entry]['hash'] == filehash else 3
-                
-            json = pre_json[entry]['files']
+    
+    json = version_json['files']
+    for entry in range(0, len(json_level) - 1, 1):
+        pre_json = json.get(json_level[entry], None)
+        json = pre_json.get('files', None)
+
+    if json is None:
+        json = pre_json['files'] = {}
         
+    pre_json = json
+    json = pre_json.get(filename, None)
+    
+    if json is None:
+        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+    else:
+        pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
+        
+    if zip_type > 0 or os.path.isdir(process_path):
         for new_filename in os.listdir(process_path):
             new_process_path = os.path.join(process_path, new_filename)
             init_file_process(new_process_path, new_filename, version_json)
-    
-    # print(f'{json_level} + {filename}: zip_type({zip_type}), isdir({isdir})')
-    if zip_type == 0 and not isdir:
-        json = version_json['files']
-        for entry in range(0, len(json_level) - 1, 1):
-            json = json[json_level[entry]]['files']
-            
-        pre_json = json
-        json = pre_json.get(filename, None)
-        
-        if json is None:
-            pre_json[filename] = {'hash': filehash, 'mark_as': 1}
-        else:
-            pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
-        
+
     json_level.pop()
     end_file_process(zip_type, process_path)
     
