@@ -241,8 +241,13 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
     os.remove(changelog_img_path)
     
     # delete all of 'marked_as'
+    global delete_keys
     for local_file in version_json['files'].keys():
-        remove_element_mark(version_json['files'][local_file])
+        remove_element_mark(version_json['files'], version_json['files'][local_file], local_file)
+        
+    for [previous, root_name] in delete_keys:
+        process_delete_keys(previous, root_name)
+    delete_keys = []
     
     version_json['short-list'] = download_short_list
     
@@ -431,10 +436,13 @@ def element_mark(root, mark_as):
         
     for file in files.keys():
         element_mark(root['files'][file], mark_as)
-        
-def remove_element_mark(root):
+
+delete_keys = []
+def remove_element_mark(previous, root, root_name):
+    global delete_keys
+    
     if root['mark_as'] == 2:
-        del root
+        delete_keys.append([previous, root_name])
         return
     
     del root['mark_as']
@@ -444,7 +452,11 @@ def remove_element_mark(root):
         return
         
     for file in files.keys():
-        remove_element_mark(root['files'][file])
+        remove_element_mark(root['files'], root['files'][file], file)
+
+
+def process_delete_keys(previous, root_name):
+    del previous[root_name]
         
 
 if __name__ == "__main__":
