@@ -200,7 +200,8 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
     
     local_list = version_json['short-list'] 
         
-    if length_hint(local_list) > 0 and length_hint(download_short_list) > 0 and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]:
+    if (length_hint(local_list) == length_hint(download_short_list)
+        and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]):
         return
              
     print(f'something has changed on {order_num}')
@@ -241,8 +242,13 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
     os.remove(changelog_img_path)
     
     # delete all of 'marked_as'
+    global delete_keys
     for local_file in version_json['files'].keys():
-        remove_element_mark(version_json['files'][local_file])
+        remove_element_mark(version_json['files'], version_json['files'][local_file], local_file)
+        
+    for [previous, root_name] in delete_keys:
+        process_delete_keys(previous, root_name)
+    delete_keys = []
     
     version_json['short-list'] = download_short_list
     
@@ -332,39 +338,28 @@ def init_file_process(input_path, filename, version_json):
         
     process_path = f'./process/{pathstr}'
     zip_type = try_extract(input_path, filename, process_path)
-    if zip_type > 0 or os.path.isdir(process_path):
-        json = version_json.get('files', {})
-        pre_json = json
-        for entry in json_level:
-            # check entry exists in version_json first
-            pre_json = json
-            json = json.get(entry, None)
-            
-            if json is None:
-                pre_json[entry] = {'hash': filehash, 'mark_as': 1, 'files': {}}
-            elif zip_type > 0 and not os.path.isdir(process_path):
-                pre_json[entry]['mark_as'] = 0 if pre_json[entry]['hash'] == filehash else 3
-                
-            json = pre_json[entry]['files']
+    
+    json = version_json['files']
+    for entry in range(0, len(json_level) - 1, 1):
+        pre_json = json.get(json_level[entry], None)
+        json = pre_json.get('files', None)
+
+    if json is None:
+        json = pre_json['files'] = {}
         
+    pre_json = json
+    json = pre_json.get(filename, None)
+    
+    if json is None:
+        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+    else:
+        pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
+        
+    if zip_type > 0 or os.path.isdir(process_path):
         for new_filename in os.listdir(process_path):
             new_process_path = os.path.join(process_path, new_filename)
             init_file_process(new_process_path, new_filename, version_json)
-    
-    # print(f'{json_level} + {filename}: zip_type({zip_type}), isdir({isdir})')
-    if zip_type == 0 and not isdir:
-        json = version_json['files']
-        for entry in range(0, len(json_level) - 1, 1):
-            json = json[json_level[entry]]['files']
-            
-        pre_json = json
-        json = pre_json.get(filename, None)
-        
-        if json is None:
-            pre_json[filename] = {'hash': filehash, 'mark_as': 1}
-        else:
-            pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
-        
+
     json_level.pop()
     end_file_process(zip_type, process_path)
     
@@ -431,10 +426,13 @@ def element_mark(root, mark_as):
         
     for file in files.keys():
         element_mark(root['files'][file], mark_as)
-        
-def remove_element_mark(root):
+
+delete_keys = []
+def remove_element_mark(previous, root, root_name):
+    global delete_keys
+    
     if root['mark_as'] == 2:
-        del root
+        delete_keys.append([previous, root_name])
         return
     
     del root['mark_as']
@@ -444,7 +442,11 @@ def remove_element_mark(root):
         return
         
     for file in files.keys():
-        remove_element_mark(root['files'][file])
+        remove_element_mark(root['files'], root['files'][file], file)
+
+
+def process_delete_keys(previous, root_name):
+    del previous[root_name]
         
 
 if __name__ == "__main__":
