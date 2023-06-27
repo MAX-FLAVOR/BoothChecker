@@ -200,7 +200,8 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
     
     local_list = version_json['short-list'] 
         
-    if length_hint(local_list) > 0 and length_hint(download_short_list) > 0 and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]:
+    if (length_hint(local_list) == length_hint(download_short_list)
+        and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]):
         return
              
     print(f'something has changed on {order_num}')
