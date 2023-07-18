@@ -2,6 +2,7 @@ __pycache__/
 /download/
 /process/
 /version/
+/archive/
 
 *.code-workspace
 *.png
