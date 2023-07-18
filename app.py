@@ -471,18 +471,26 @@ if __name__ == "__main__":
     refresh_interval = 600
     
     createFolder("./version")
-    createFolder("./download")
-    createFolder("./process")
     createFolder("./archive")
 
     while True:
+        # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
+        shutil.rmtree("./download")
+        shutil.rmtree("./process")
+        
+        createFolder("./download")
+        createFolder("./process")
+
         for product in config_json['products']:     
             booth_name = product['booth-product-name']
             booth_url = product['booth-product-url']
             booth_order_number = product['booth-order-number']
             booth_products = product.get('booth-check-only')
             
-            init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url)
+            try:
+                init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url)
+            except PermissionError:
+                print(f'error occured on checking {booth_order_number}')
 
         # 갱신 대기
         print("waiting for refresh")
