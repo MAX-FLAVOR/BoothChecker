@@ -7,6 +7,7 @@ import requests
 import simdjson
 from bs4 import BeautifulSoup
 from time import sleep
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from operator import length_hint
 # from jsonpointer import resolve_pointer
@@ -210,12 +211,21 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2)
     
+    current_time = datetime.now().strftime('%Y-%m-%d %H %M')
+    archive_folder = f'./archive/{current_time}'
+    os.makedirs(archive_folder, exist_ok=True)
+    
     for item in download_url_list: 
         # download stuff
         download_path = f'./download/{item[1]}'
         
         print(f'downloading {item[0]} to {download_path}')
         download_item(item[0], download_path, cookie)
+        
+        # archive stuff
+        if (item[0] not in local_list):
+            archive_path = archive_folder + '/' + item[1]
+            shutil.copyfile(download_path, archive_path)
         
         print('parsing its structure')
         init_file_process(download_path, item[1], version_json)
@@ -461,17 +471,26 @@ if __name__ == "__main__":
     refresh_interval = 600
     
     createFolder("./version")
-    createFolder("./download")
-    createFolder("./process")
+    createFolder("./archive")
 
     while True:
+        # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
+        shutil.rmtree("./download")
+        shutil.rmtree("./process")
+        
+        createFolder("./download")
+        createFolder("./process")
+
         for product in config_json['products']:     
             booth_name = product['booth-product-name']
             booth_url = product['booth-product-url']
             booth_order_number = product['booth-order-number']
             booth_products = product.get('booth-check-only')
             
-            init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url)
+            try:
+                init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url)
+            except PermissionError:
+                print(f'error occured on checking {booth_order_number}')
 
         # 갱신 대기
         print("waiting for refresh")
