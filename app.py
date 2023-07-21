@@ -385,10 +385,12 @@ def end_file_process(zip_type, process_path):
              
 def try_extract(input_path, input_filename, output_path):
     zip_type = is_compressed(input_path)
+    
     if zip_type == 1:
         temp_output = f'./{input_filename}'
         shutil.move(input_path, temp_output)
         zip_file = zipfile.ZipFile(temp_output, 'r')
+
         os.makedirs(output_path, exist_ok=True)
         zip_file.extractall(output_path)
         zip_file.close()
@@ -396,15 +398,16 @@ def try_extract(input_path, input_filename, output_path):
     elif zip_type == 2:
         temp_output = f'./{input_filename}'
         shutil.move(input_path, temp_output)
+        
         os.makedirs(output_path, exist_ok=True)
         extractPackage(temp_output, outputPath=output_path)
+        
         os.remove(temp_output)
     else:
         shutil.move(input_path, output_path)
         
     return zip_type
 
-        
 
 def is_compressed(path):
 ###
@@ -413,7 +416,6 @@ def is_compressed(path):
 #   - 1: zip
 #   - 2: unitypackage
 ###
-    
     if path.endswith('.zip'):
         return 1
     elif path.endswith('.unitypackage'):
@@ -425,8 +427,8 @@ def calc_file_hash(path):
     data = open(path, 'rb').read()
     hash = hashlib.md5(data).hexdigest()
     return hash
-    
-    
+
+
 def element_mark(root, mark_as): 
     root['mark_as'] = mark_as
 
