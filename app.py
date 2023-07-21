@@ -424,8 +424,9 @@ def is_compressed(path):
     return 0
 
 def calc_file_hash(path):
-    data = open(path, 'rb').read()
-    hash = hashlib.md5(data).hexdigest()
+    with open(path, 'rb') as f:
+        data = f.read()
+        hash = hashlib.md5(data).hexdigest()
     return hash
 
 
