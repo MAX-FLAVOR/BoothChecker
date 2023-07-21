@@ -186,7 +186,7 @@ def error_webhook(webhook_url):
     }
     requests.post(webhook_url, json=payload)
 
-def init_update_check(name, url, order_num, products, cookie, webhook_url):
+def init_update_check(name, url, order_num, products, cookie, webhook_url, encoding):
     download_short_list = list()
     thumblist = list()
     download_url_list = crawling(order_num, products, cookie, download_short_list, thumblist)
@@ -228,7 +228,7 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url):
             shutil.copyfile(download_path, archive_path)
         
         print('parsing its structure')
-        init_file_process(download_path, item[1], version_json)
+        init_file_process(download_path, item[1], version_json, encoding)
         
     # create image from 'files' tree
     global current_string, current_level, current_count, highest_level
@@ -330,7 +330,7 @@ def get_offset(level, count):
 
 
 json_level = []
-def init_file_process(input_path, filename, version_json):
+def init_file_process(input_path, filename, version_json, encoding):
     json_level.append(filename)
     
     pathstr = ''
@@ -347,7 +347,7 @@ def init_file_process(input_path, filename, version_json):
         filehash = "DIRECTORY"
         
     process_path = f'./process/{pathstr}'
-    zip_type = try_extract(input_path, filename, process_path)
+    zip_type = try_extract(input_path, filename, process_path, encoding)
     
     json = version_json['files']
     for entry in range(0, len(json_level) - 1, 1):
@@ -368,7 +368,7 @@ def init_file_process(input_path, filename, version_json):
     if zip_type > 0 or os.path.isdir(process_path):
         for new_filename in os.listdir(process_path):
             new_process_path = os.path.join(process_path, new_filename)
-            init_file_process(new_process_path, new_filename, version_json)
+            init_file_process(new_process_path, new_filename, version_json, encoding)
 
     json_level.pop()
     end_file_process(zip_type, process_path)
@@ -382,13 +382,15 @@ def end_file_process(zip_type, process_path):
     else:
         os.remove(process_path)
     
-             
-def try_extract(input_path, input_filename, output_path):
+# NOTE: Currently, @encoding only applies on zip_type == 1
+def try_extract(input_path, input_filename, output_path, encoding):
     zip_type = is_compressed(input_path)
+    
     if zip_type == 1:
         temp_output = f'./{input_filename}'
         shutil.move(input_path, temp_output)
-        zip_file = zipfile.ZipFile(temp_output, 'r')
+        zip_file = zipfile.ZipFile(temp_output, 'r', metadata_encoding=encoding)
+
         os.makedirs(output_path, exist_ok=True)
         zip_file.extractall(output_path)
         zip_file.close()
@@ -396,15 +398,16 @@ def try_extract(input_path, input_filename, output_path):
     elif zip_type == 2:
         temp_output = f'./{input_filename}'
         shutil.move(input_path, temp_output)
+        
         os.makedirs(output_path, exist_ok=True)
         extractPackage(temp_output, outputPath=output_path)
+        
         os.remove(temp_output)
     else:
         shutil.move(input_path, output_path)
         
     return zip_type
 
-        
 
 def is_compressed(path):
 ###
@@ -413,7 +416,6 @@ def is_compressed(path):
 #   - 1: zip
 #   - 2: unitypackage
 ###
-    
     if path.endswith('.zip'):
         return 1
     elif path.endswith('.unitypackage'):
@@ -422,11 +424,12 @@ def is_compressed(path):
     return 0
 
 def calc_file_hash(path):
-    data = open(path, 'rb').read()
-    hash = hashlib.md5(data).hexdigest()
+    with open(path, 'rb') as f:
+        data = f.read()
+        hash = hashlib.md5(data).hexdigest()
     return hash
-    
-    
+
+
 def element_mark(root, mark_as): 
     root['mark_as'] = mark_as
 
@@ -486,9 +489,10 @@ if __name__ == "__main__":
             booth_url = product['booth-product-url']
             booth_order_number = product['booth-order-number']
             booth_products = product.get('booth-check-only')
+            encoding = product.get('intent-encoding')
             
             try:
-                init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url)
+                init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url, encoding)
             except PermissionError:
                 print(f'error occured on checking {booth_order_number}')
 

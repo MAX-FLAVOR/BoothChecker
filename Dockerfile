@@ -1,4 +1,4 @@
-FROM python:3.10.11
+FROM python:3.11.4
 ENV TZ=Asia/Seoul
 RUN apt-get update && apt-get upgrade -y
 WORKDIR /root/booth-update-checker
