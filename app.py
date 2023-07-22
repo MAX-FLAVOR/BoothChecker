@@ -470,13 +470,6 @@ def process_delete_keys(previous, root_name):
 
 if __name__ == "__main__":
     global booth_cookie, discord_webhook_url
-    
-    file = open('checklist.json')
-    config_json = simdjson.load(file)
-
-    # 계정
-    booth_cookie = {"_plaza_session_nktz7u": config_json['session-cookie']}
-    discord_webhook_url = config_json['discord-webhook-url']
 
     # 갱신 간격 (초)
     refresh_interval = 600
@@ -485,6 +478,14 @@ if __name__ == "__main__":
     createFolder("./archive")
 
     while True:
+        config_json = {}
+        with open("checklist.json") as file:
+            config_json = simdjson.load(file)
+            
+        # 계정
+        booth_cookie = {"_plaza_session_nktz7u": config_json['session-cookie']}
+        discord_webhook_url = config_json['discord-webhook-url']
+
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")
