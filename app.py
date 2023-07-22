@@ -186,10 +186,16 @@ def error_webhook(webhook_url):
     }
     requests.post(webhook_url, json=payload)
 
-def init_update_check(name, url, order_num, products, cookie, webhook_url, encoding):
+def init_update_check(product):
+    name = product['booth-product-name']
+    url = product['booth-product-url']
+    order_num = product['booth-order-number']
+    check_only_list = product.get('booth-check-only')
+    encoding = product.get('intent-encoding')
+            
     download_short_list = list()
     thumblist = list()
-    download_url_list = crawling(order_num, products, cookie, download_short_list, thumblist)
+    download_url_list = crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
 
     version_file_path = f'./version/{order_num}.json'
     if not os.path.exists(version_file_path):
@@ -220,7 +226,7 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url, encod
         download_path = f'./download/{item[1]}'
         
         print(f'downloading {item[0]} to {download_path}')
-        download_item(item[0], download_path, cookie)
+        download_item(item[0], download_path, booth_cookie)
         
         # archive stuff
         if (item[0] not in local_list):
@@ -247,7 +253,7 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url, encod
     
     # add webhook
     author_info = crawling_product(url)
-    webhook(webhook_url, url, name, local_list, download_short_list, author_info, thumblist[0])
+    webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumblist[0])
     
     os.remove(changelog_img_path)
     
@@ -463,6 +469,8 @@ def process_delete_keys(previous, root_name):
         
 
 if __name__ == "__main__":
+    global booth_cookie, discord_webhook_url
+    
     file = open('checklist.json')
     config_json = simdjson.load(file)
 
@@ -484,18 +492,13 @@ if __name__ == "__main__":
         createFolder("./download")
         createFolder("./process")
 
-        for product in config_json['products']:     
-            booth_name = product['booth-product-name']
-            booth_url = product['booth-product-url']
-            booth_order_number = product['booth-order-number']
-            booth_products = product.get('booth-check-only')
-            encoding = product.get('intent-encoding')
-            
+        for product in config_json['products']:
             try:
-                init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url, encoding)
+                init_update_check(product)
             except PermissionError:
-                print(f'error occured on checking {booth_order_number}')
-
+                order_num = product['booth-order-number']
+                print(f'error occured on checking {order_num}')
+            
         # 갱신 대기
         print("waiting for refresh")
         sleep(refresh_interval)
