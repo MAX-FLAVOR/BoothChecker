@@ -186,10 +186,16 @@ def error_webhook(webhook_url):
     }
     requests.post(webhook_url, json=payload)
 
-def init_update_check(name, url, order_num, products, cookie, webhook_url, encoding):
+def init_update_check(product):
+    name = product['booth-product-name']
+    url = product['booth-product-url']
+    order_num = product['booth-order-number']
+    check_only_list = product.get('booth-check-only')
+    encoding = product.get('intent-encoding')
+            
     download_short_list = list()
     thumblist = list()
-    download_url_list = crawling(order_num, products, cookie, download_short_list, thumblist)
+    download_url_list = crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
 
     version_file_path = f'./version/{order_num}.json'
     if not os.path.exists(version_file_path):
@@ -220,7 +226,7 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url, encod
         download_path = f'./download/{item[1]}'
         
         print(f'downloading {item[0]} to {download_path}')
-        download_item(item[0], download_path, cookie)
+        download_item(item[0], download_path, booth_cookie)
         
         # archive stuff
         if (item[0] not in local_list):
@@ -247,7 +253,7 @@ def init_update_check(name, url, order_num, products, cookie, webhook_url, encod
     
     # add webhook
     author_info = crawling_product(url)
-    webhook(webhook_url, url, name, local_list, download_short_list, author_info, thumblist[0])
+    webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumblist[0])
     
     os.remove(changelog_img_path)
     
@@ -463,12 +469,7 @@ def process_delete_keys(previous, root_name):
         
 
 if __name__ == "__main__":
-    file = open('checklist.json')
-    config_json = simdjson.load(file)
-
-    # 계정
-    booth_cookie = {"_plaza_session_nktz7u": config_json['session-cookie']}
-    discord_webhook_url = config_json['discord-webhook-url']
+    global booth_cookie, discord_webhook_url
 
     # 갱신 간격 (초)
     refresh_interval = 600
@@ -477,6 +478,14 @@ if __name__ == "__main__":
     createFolder("./archive")
 
     while True:
+        config_json = {}
+        with open("checklist.json") as file:
+            config_json = simdjson.load(file)
+            
+        # 계정
+        booth_cookie = {"_plaza_session_nktz7u": config_json['session-cookie']}
+        discord_webhook_url = config_json['discord-webhook-url']
+
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")
@@ -484,18 +493,22 @@ if __name__ == "__main__":
         createFolder("./download")
         createFolder("./process")
 
-        for product in config_json['products']:     
-            booth_name = product['booth-product-name']
-            booth_url = product['booth-product-url']
-            booth_order_number = product['booth-order-number']
-            booth_products = product.get('booth-check-only')
-            encoding = product.get('intent-encoding')
-            
+        for product in config_json['products']:
+            # BOOTH Heartbeat
+            # KT™ Sucks. Thank you.
             try:
-                init_update_check(booth_name, booth_url, booth_order_number, booth_products, booth_cookie, discord_webhook_url, encoding)
+                print('Checking BOOTH heartbeat')
+                requests.get("https://booth.pm")
+            except:
+                print('BOOTH heartbeat failed')
+                break
+        
+            try:
+                init_update_check(product)
             except PermissionError:
-                print(f'error occured on checking {booth_order_number}')
-
+                order_num = product['booth-order-number']
+                print(f'error occured on checking {order_num}')
+            
         # 갱신 대기
         print("waiting for refresh")
         sleep(refresh_interval)
