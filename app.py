@@ -494,6 +494,15 @@ if __name__ == "__main__":
         createFolder("./process")
 
         for product in config_json['products']:
+            # BOOTH Heartbeat
+            # KT™ Sucks. Thank you.
+            try:
+                print('Checking BOOTH heartbeat')
+                requests.get("https://booth.pm")
+            except:
+                print('BOOTH heartbeat failed')
+                break
+        
             try:
                 init_update_check(product)
             except PermissionError:
