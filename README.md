@@ -1,5 +1,20 @@
 # booth-update-checker
 
+### Docker-Compose
+```
+version: "3"
+
+services:
+  booth-update-checker:
+    build: .
+    container_name: booth-update-checker
+    volumes:
+      - ./checklist.json:/root/booth-update-checker/checklist.json
+      - ./[ONLY_TTF_FILE]:/root/booth-update-checker/font.ttf
+    restart: unless-stopped
+```
+
+
 ### Checklist Configuration
 
 `checklist.json`

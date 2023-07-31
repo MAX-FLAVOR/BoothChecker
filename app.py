@@ -492,6 +492,9 @@ if __name__ == "__main__":
         shutil.rmtree("./download")
         shutil.rmtree("./process")
 
+        createFolder("./download")
+        createFolder("./process")
+
         for product in config_json['products']:
             # BOOTH Heartbeat
             # KT™ Sucks. Thank you.

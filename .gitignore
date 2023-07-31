@@ -6,3 +6,5 @@ __pycache__/
 
 *.code-workspace
 *.png
+
+docker-test.sh
