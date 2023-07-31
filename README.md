@@ -24,7 +24,7 @@
         {
             "booth-product-name": "BOOTH_PRODUCT2_NAME_HERE",
             "booth-product-url": "https://[SOMEONE].booth.pm/items/[ITEM_NUMBER]",
-            "booth-order-number": "BOOTH_ORDER_NUMBER_HERE",
+            "booth-order-number": "BOOTH_ORDER_NUMBER_HERE"
         }
     ]
 }

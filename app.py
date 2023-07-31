@@ -274,7 +274,7 @@ def init_update_check(product):
     
     file.close()
     
-font = ImageFont.truetype('NanumGothic.ttf', size=16)
+font = ImageFont.truetype('font.ttf', size=16)
 font_color = 'rgb(255, 255, 255)'
 def make_image(x, y):
     image = Image.new('RGB', (x, y), color = 'rgb(54, 57, 63)')
@@ -476,6 +476,8 @@ if __name__ == "__main__":
     
     createFolder("./version")
     createFolder("./archive")
+    createFolder("./download")
+    createFolder("./process")
 
     while True:
         config_json = {}
@@ -489,9 +491,6 @@ if __name__ == "__main__":
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")
-        
-        createFolder("./download")
-        createFolder("./process")
 
         for product in config_json['products']:
             # BOOTH Heartbeat

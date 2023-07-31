@@ -1,13 +1,24 @@
 {
-    "session-cookie": "",
-    "discord-webhook-url": "",
+    "session-cookie": "YOUR_COOKIE_HERE",
+    "discord-webhook-url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
 
     "products":
     [
         {
-            "booth-product-name": "",
-            "booth-product-url": "",
-            "booth-order-number": ""
+            "booth-product-name": "BOOTH_PRODUCT_NAME_HERE",
+            "booth-product-url": "https://[SOMEONE].booth.pm/items/[ITEM_NUMBER]",
+            "booth-order-number": "BOOTH_ORDER_NUMBER_HERE",
+
+            "booth-check-only": [
+                "BOOTH_PRODUCT_NUMBER_1_HERE",
+                "BOOTH_PRODUCT_NUMBER_2_HERE"
+            ],
+            "intent-encoding": "shift_jis"
+        },
+        {
+            "booth-product-name": "BOOTH_PRODUCT2_NAME_HERE",
+            "booth-product-url": "https://[SOMEONE].booth.pm/items/[ITEM_NUMBER]",
+            "booth-order-number": "BOOTH_ORDER_NUMBER_HERE"
         }
     ]
 }
