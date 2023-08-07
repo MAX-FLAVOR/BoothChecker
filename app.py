@@ -206,9 +206,10 @@ def init_update_check(product):
     version_json = simdjson.load(file)
     
     local_list = version_json['short-list'] 
-        
+
     if (length_hint(local_list) == length_hint(download_short_list)
-        and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]):
+        and ((length_hint(local_list) == 0 and length_hint(download_short_list) == 0)
+            or (local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]))):
         return
              
     print(f'something has changed on {order_num}')
