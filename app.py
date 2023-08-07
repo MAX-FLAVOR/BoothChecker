@@ -254,7 +254,14 @@ def init_update_check(product):
     
     # add webhook
     author_info = crawling_product(url)
-    webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumblist[0])
+    
+    # FIXME: This was not supposed to exist.
+    # But somehow getting error because of this empty thumblist.  
+    thumb = "https://asset.booth.pm/assets/thumbnail_placeholder_f_150x150-73e650fbec3b150090cbda36377f1a3402c01e36ff9fa96158de6016fa067d01.png"
+    if length_hint(thumblist) > 0: 
+        thumb = thumblist[0]
+        
+    webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb)
     
     os.remove(changelog_img_path)
     
