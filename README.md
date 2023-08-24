@@ -10,10 +10,10 @@ services:
     container_name: booth-update-checker
     volumes:
       - ./checklist.json:/root/booth-update-checker/checklist.json
-      - ./[ONLY_TTF_FILE]:/root/booth-update-checker/font.ttf
     restart: unless-stopped
 ```
 
+---
 
 ### Checklist Configuration
 
@@ -53,3 +53,8 @@ Reference: https://learn.microsoft.com/ko-kr/windows/win32/intl/code-page-identi
 - Korean: 949 (ks_c_5601-1987)
 - UTF-8: 65001 (utf-8)
 
+---
+### Font
+이 프로젝트에는 네이버에서 제공한 나눔글꼴이 적용되어 있습니다.
+
+https://help.naver.com/service/30016/contents/18088?osType=PC&lang=ko
