@@ -1,6 +1,6 @@
 from PIL import Image, ImageFont, ImageDraw
 
-font = ImageFont.truetype('font.ttf', size=16)
+font = ImageFont.truetype('NanumSquareNeo-bRg.ttf', size=16)
 font_color = 'rgb(255, 255, 255)'
 
 def print_img(img, current_string):
