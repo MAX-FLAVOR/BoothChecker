@@ -1,18 +1,18 @@
-import os.path
 import shutil
 import zipfile
 import hashlib
-import re
 import requests
-import simdjson
-from bs4 import BeautifulSoup
+
 from time import sleep
 from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 from operator import length_hint
-# from jsonpointer import resolve_pointer
 from unitypackage_extractor.extractor import extractPackage
-from requests_toolbelt.multipart.encoder import MultipartEncoder
+
+from shared import *
+import booth
+import image
+import discord
 
 # mark_as
 #   - 0: Nothing
@@ -25,167 +25,6 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 # download_url_list
 #   - [download_number, filename]
 
-changelog_img_path = 'changelog_temp.png'
-
-def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None):
-    url = f'https://accounts.booth.pm/orders/{order_num}'
-    response = requests.get(url=url, cookies=cookie)
-    html = response.content
-    
-    download_url_list = list()
-    soup = BeautifulSoup(html, "html.parser")
-    
-    product_divs = soup.find_all("div", class_="sheet sheet--p400 mobile:pt-[13px] mobile:px-16 mobile:pb-8")
-    for product_div in product_divs:
-        product_link = product_div.select_one("a")
-        product_url = product_link.get("href")
-        product_number = re.sub(r'[^0-9]', '', product_url)
-        
-        if product_only is not None and product_number not in product_only:
-            continue
-        
-        thumb_link = product_div.select_one("img")
-        thumb_url = thumb_link.get("src")
-        if not thumblist is None:
-            thumblist.append(thumb_url)
-        
-        divs = product_div.select("div.legacy-list-item__center")
-        for div in divs:
-            download_link = div.select_one("a.nav-reverse")
-            filename_div = div.select_one("div.u-flex-1")
-            
-            href = download_link.get("href")
-            filename = filename_div.get_text()
-
-            href = re.sub(r'[^0-9]', '', href)
-            download_url_list.append([href, filename])
-            
-            if not shortlist is None:
-                shortlist.append(href)
-            
-    return download_url_list
-
-
-def download_item(download_number, filepath, cookie):
-    url = f'https://booth.pm/downloadables/{download_number}'
-    
-    response = requests.get(url=url, cookies=cookie)
-    open(filepath, "wb").write(response.content)
-    
-    
-def crawling_product(url):
-    response = requests.get(url)
-    html = response.content
-    
-    soup = BeautifulSoup(html, "html.parser")
-    author_div = soup.find("a", class_="flex gap-4 items-center no-underline preserve-half-leading !text-current typography-16 w-fit")
-    # None: private store
-    if author_div is None:
-        return None
-    
-    author_image = author_div.select_one("img")
-    author_image_url = author_image.get("src")
-    author_name = author_image.get("alt")
-    
-    return [author_image_url, author_name]
-    
-
-def createVersionFile(version_file_path, order_num):
-    f = open(version_file_path, 'w')
-    
-    short_list = {'short-list': [], 'files': {}}
-    # shortlist = {"short-list": download_url_list, 'files': {}}
-    
-    # for fileroot in download_url_list:
-    #     shortlist['files'][f'{fileroot}'] = {}
-    
-    simdjson.dump(short_list, fp = f, indent = 4)
-    f.close()
-    
-    print(f'{order_num} version file created')
-    
-    
-def createFolder(directory):
-    try:
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-    except OSError:
-        print ('Error: Creating directory. ' +  directory)
-
-
-def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb):
-    fields = list()
-    fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
-    fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
-    
-    if author_info is not None:
-        author_icon = author_info[0]
-        author_name = author_info[1] + " "
-    else:
-        author_name = ""
-        author_icon = ""
-    
-    payload = {
-        "content": "@here",
-        "embeds": [
-            {
-                "title": name,
-                "color": 65280,
-                "fields": fields,
-                "author": {
-                    "name": author_name + 'BOOTH 업데이트 발견',
-                    "icon_url": author_icon
-                },
-                "footer": {
-                    "icon_url": "https://booth.pm/static-images/pwa/icon_size_128.png",
-                    "text": "BOOTH.pm"
-                },
-                "thumbnail": {
-                    "url": thumb
-                },
-                "url": url
-            },
-            {
-                "title": "CHANGELOG",
-                "color": 65280,
-                "image": {
-                    "url": f'attachment://{changelog_img_path}'
-                }
-            }
-        ],
-        "attachments": [
-            {
-                "id": 0,
-                "description": "BOOTH Download Changelog",
-                "filename": changelog_img_path
-            }
-        ] 
-    }
-
-    # This convert dict to string with keep double quote like: "content": "@here"
-    payload_str = simdjson.dumps(payload)
-    
-    mpe = MultipartEncoder(
-        fields = {
-            "payload_json": payload_str,  
-            'files[0]': (changelog_img_path, open(changelog_img_path, 'rb'), 'image/png')
-        }
-    )
-    
-    requests.post(webhook_url, data=mpe, headers={'Content-Type': mpe.content_type})
-
-def error_webhook(webhook_url):
-    payload = {
-        "content": "@here",
-        "embeds": [
-            {
-                "title": "BOOTH 응답 없음",
-                "color": 16711680
-            }
-        ]  
-    }
-    requests.post(webhook_url, json=payload)
-
 def init_update_check(product):
     name = product['booth-product-name']
     url = product['booth-product-url']
@@ -195,7 +34,7 @@ def init_update_check(product):
             
     download_short_list = list()
     thumblist = list()
-    download_url_list = crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
+    download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
 
     version_file_path = f'./version/{order_num}.json'
     if not os.path.exists(version_file_path):
@@ -218,7 +57,6 @@ def init_update_check(product):
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2)
     
-    current_time = datetime.now().strftime('%Y-%m-%d %H %M')
     archive_folder = f'./archive/{current_time}'
     os.makedirs(archive_folder, exist_ok=True)
     
@@ -227,7 +65,7 @@ def init_update_check(product):
         download_path = f'./download/{item[1]}'
         
         print(f'downloading {item[0]} to {download_path}')
-        download_item(item[0], download_path, booth_cookie)
+        booth.download_item(item[0], download_path, booth_cookie)
         
         # archive stuff
         if (item[0] not in local_list):
@@ -246,14 +84,14 @@ def init_update_check(product):
     highest_level = 0
     get_files_str(version_json)
     
-    offset = get_offset(highest_level, current_count)
-    img = make_image(1024, offset[1])
-    print_img(img)
+    offset = image.get_offset(highest_level, current_count)
+    img = image.make_image(1024, offset[1])
+    image.print_img(img, current_string)
     # img = img.resize(size=(2048, offset[1]))
     img.save(changelog_img_path)
     
     # add webhook
-    author_info = crawling_product(url)
+    author_info = booth.crawling_product(url)
     
     # FIXME: This was not supposed to exist.
     # But somehow getting error because of this empty thumblist.  
@@ -261,7 +99,7 @@ def init_update_check(product):
     if length_hint(thumblist) > 0: 
         thumb = thumblist[0]
         
-    webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb)
+    discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb)
     
     os.remove(changelog_img_path)
     
@@ -281,12 +119,7 @@ def init_update_check(product):
     simdjson.dump(version_json, fp = file, indent = 4)
     
     file.close()
-    
-font = ImageFont.truetype('font.ttf', size=16)
-font_color = 'rgb(255, 255, 255)'
-def make_image(x, y):
-    image = Image.new('RGB', (x, y), color = 'rgb(54, 57, 63)')
-    return image
+
 
 current_string = ""
 current_level = 0
@@ -312,13 +145,10 @@ def get_files_str(root):
 
         symbol = ''
         if root['files'][file]['mark_as'] == 1:
-            # symbol = '📝'
             symbol = '(Added)'
         elif root['files'][file]['mark_as'] == 2:
-            # symbol = '⛔'
             symbol = '(Deleted)'
         elif root['files'][file]['mark_as'] == 3:
-            # symbol = '♺'
             symbol = '(Changed)'
 
         current_count += 1
@@ -328,19 +158,6 @@ def get_files_str(root):
         get_files_str(root['files'][file])
         
     current_level -= 1
-    
-    
-def print_img(img):
-    global current_string
-    
-    draw = ImageDraw.Draw(img)
-    draw.text((0, 0), current_string, font=font, fill=font_color)
-
-
-def get_offset(level, count):
-    x_offset = 64 * level
-    y_offset = 20 * count
-    return (x_offset, y_offset)
 
 
 json_level = []
@@ -477,7 +294,7 @@ def process_delete_keys(previous, root_name):
         
 
 if __name__ == "__main__":
-    global booth_cookie, discord_webhook_url
+    global current_time, booth_cookie, discord_webhook_url
 
     # 갱신 간격 (초)
     refresh_interval = 600
@@ -502,6 +319,8 @@ if __name__ == "__main__":
 
         createFolder("./download")
         createFolder("./process")
+        
+        current_time = datetime.now().strftime('%Y-%m-%d %H %M')
 
         for product in config_json['products']:
             # BOOTH Heartbeat
