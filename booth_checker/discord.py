@@ -4,10 +4,11 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from shared import changelog_img_path
 
-def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb):
+def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb, number_show):
     fields = list()
-    fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
-    fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
+    if number_show is not False:
+        fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
+        fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
     
     if author_info is not None:
         author_icon = author_info[0]
@@ -21,10 +22,11 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
         "embeds": [
             {
                 "title": name,
+                "description": "BOOTH 업데이트 발견!",
                 "color": 65280,
                 "fields": fields,
                 "author": {
-                    "name": author_name + 'BOOTH 업데이트 발견',
+                    "name": author_name,
                     "icon_url": author_icon
                 },
                 "footer": {

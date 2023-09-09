@@ -31,6 +31,7 @@ def init_update_check(product):
     order_num = product['booth-order-number']
     check_only_list = product.get('booth-check-only')
     encoding = product.get('intent-encoding')
+    number_show = product.get('download-number-show')
             
     download_short_list = list()
     thumblist = list()
@@ -99,7 +100,7 @@ def init_update_check(product):
     if length_hint(thumblist) > 0: 
         thumb = thumblist[0]
         
-    discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb)
+    discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb, number_show)
     
     os.remove(changelog_img_path)
     

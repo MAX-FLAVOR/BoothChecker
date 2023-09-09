@@ -6,4 +6,5 @@ services:
     container_name: booth-update-checker
     volumes:
       - ./checklist.json:/root/booth-update-checker/checklist.json
+      - ./version:/root/booth-update-checker/version
     restart: unless-stopped

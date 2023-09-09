@@ -10,10 +10,11 @@
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE",
 
             "booth-check-only": [
-                "BOOTH_PRODUCT_NUMBER_1_HERE",
-                "BOOTH_PRODUCT_NUMBER_2_HERE"
+                "ITEM_NUMBER_1",
+                "ITEM_NUMBER_2"
             ],
-            "intent-encoding": "shift_jis"
+            "intent-encoding": "shift_jis",
+            "download-number-show": false
         },
         {
             "booth-product-name": "BOOTH_PRODUCT2_NAME_HERE",
