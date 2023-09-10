@@ -32,6 +32,7 @@ def init_update_check(product):
     encoding = product.get('intent-encoding')
     number_show = product.get('download-number-show')
     changelog_show = product.get('changelog-show')
+    archive_this = product.get('archive_this', True)
             
     download_short_list = list()
     thumblist = list()
@@ -75,7 +76,7 @@ def init_update_check(product):
         booth.download_item(item[0], download_path, booth_cookie)
         
         # archive stuff
-        if (item[0] not in local_list):
+        if archive_this and item[0] not in local_list:
             archive_path = archive_folder + '/' + item[1]
             shutil.copyfile(download_path, archive_path)
         
