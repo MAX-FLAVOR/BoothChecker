@@ -5,20 +5,17 @@
     "products":
     [
         {
-            "booth-product-name": "BOOTH_PRODUCT_NAME_HERE",
-            "booth-product-url": "https://[SOMEONE].booth.pm/items/[ITEM_NUMBER]",
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE",
-
+            "booth-product-name": "BOOTH_PROUCT_NAME_HERE",
             "booth-check-only": [
                 "ITEM_NUMBER_1",
                 "ITEM_NUMBER_2"
             ],
             "intent-encoding": "shift_jis",
-            "download-number-show": false
+            "download-number-show": false,
+            "changelog-show": false
         },
         {
-            "booth-product-name": "BOOTH_PRODUCT2_NAME_HERE",
-            "booth-product-url": "https://[SOMEONE].booth.pm/items/[ITEM_NUMBER]",
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE"
         }
     ]

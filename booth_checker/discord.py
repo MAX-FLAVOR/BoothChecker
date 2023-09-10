@@ -4,7 +4,7 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from shared import changelog_img_path
 
-def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb, number_show):
+def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb, number_show, changelog_show):
     fields = list()
     if number_show is not False:
         fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
@@ -37,33 +37,35 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
                     "url": thumb
                 },
                 "url": url
-            },
-            {
-                "title": "CHANGELOG",
-                "color": 65280,
-                "image": {
-                    "url": f'attachment://{changelog_img_path}'
-                }
             }
-        ],
-        "attachments": [
+        ]
+    }
+
+    fields = dict()
+    
+    if changelog_show is not False:
+        payload["embeds"].append({
+            "title": "CHANGELOG",
+            "color": 65280,
+            "image": {
+                "url": f'attachment://{changelog_img_path}'
+            }
+        })
+        payload["attachments"] = [
             {
                 "id": 0,
                 "description": "BOOTH Download Changelog",
                 "filename": changelog_img_path
             }
-        ] 
-    }
+        ]
+        fields["files[0]"] = (changelog_img_path, open(changelog_img_path, 'rb'), 'image/png')
 
     # This convert dict to string with keep double quote like: "content": "@here"
     payload_str = simdjson.dumps(payload)
+
+    fields["payload_json"] = payload_str
     
-    mpe = MultipartEncoder(
-        fields = {
-            "payload_json": payload_str,  
-            'files[0]': (changelog_img_path, open(changelog_img_path, 'rb'), 'image/png')
-        }
-    )
+    mpe = MultipartEncoder(fields)
     
     requests.post(webhook_url, data=mpe, headers={'Content-Type': mpe.content_type})
 

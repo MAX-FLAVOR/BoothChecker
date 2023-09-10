@@ -26,16 +26,22 @@ import discord
 #   - [download_number, filename]
 
 def init_update_check(product):
-    name = product['booth-product-name']
-    url = product['booth-product-url']
     order_num = product['booth-order-number']
+    name = product.get('booth-product-name')
     check_only_list = product.get('booth-check-only')
     encoding = product.get('intent-encoding')
     number_show = product.get('download-number-show')
+    changelog_show = product.get('changelog-show')
             
     download_short_list = list()
     thumblist = list()
     download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
+
+    if name is None:
+        name = download_url_list[1][0][0]
+    url = download_url_list[1][0][1]
+
+    download_url_list = download_url_list[0]
 
     version_file_path = f'./version/{order_num}.json'
     if not os.path.exists(version_file_path):
@@ -100,7 +106,7 @@ def init_update_check(product):
     if length_hint(thumblist) > 0: 
         thumb = thumblist[0]
         
-    discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb, number_show)
+    discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb, number_show, changelog_show)
     
     os.remove(changelog_img_path)
     

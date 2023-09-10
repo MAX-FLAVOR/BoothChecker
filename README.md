@@ -27,25 +27,32 @@ services:
     "products":
     [
         {
-            "booth-product-name": "BOOTH_PRODUCT_NAME_HERE",
-            "booth-product-url": "https://[SOMEONE].booth.pm/items/[ITEM_NUMBER]",
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE",
-
+            "booth-product-name": "BOOTH_PROUCT_NAME_HERE",
             "booth-check-only": [
                 "ITEM_NUMBER_1",
                 "ITEM_NUMBER_2"
             ],
             "intent-encoding": "shift_jis",
-            "download-number-show": false
+            "download-number-show": false,
+            "changelog-show": false
         },
         {
-            "booth-product-name": "BOOTH_PRODUCT2_NAME_HERE",
-            "booth-product-url": "https://[SOMEONE].booth.pm/items/[ITEM_NUMBER]",
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE"
         }
     ]
 }
 ```
+
+### 옵션
+
+booth-order-number를 제외한 나머지는 옵션입니다.
+
+`booth-product-name`
+
+아이템의 이름을 지정할 수 있습니다.
+
+지정을 안하면 아이템 페이지의 이름을 가져옵니다.
 
 `booth-check-only`
 
@@ -64,6 +71,14 @@ Reference: https://learn.microsoft.com/ko-kr/windows/win32/intl/code-page-identi
 `download-number-show`
 
 Discord 알림에 다운로드 넘버를 표시할지 설정할 수 있습니다.
+
+기본 값은 true입니다.
+
+`changelog-show`
+
+Discord 알림에 체인지로그 이미지를 표시할지 설정할 수 있습니다.
+
+기본 값은 true입니다.
 
 ---
 ### Font

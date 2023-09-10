@@ -8,17 +8,21 @@ def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None
     html = response.content
     
     download_url_list = list()
+    product_info_list = list()
     soup = BeautifulSoup(html, "html.parser")
     
     product_divs = soup.find_all("div", class_="sheet sheet--p400 mobile:pt-[13px] mobile:px-16 mobile:pb-8")
     for product_div in product_divs:
-        product_link = product_div.select_one("a")
-        product_url = product_link.get("href")
+        product_info = product_div.select("a")[1]
+        product_name = product_info.get_text()
+        product_url = product_info.get("href")
         product_number = re.sub(r'[^0-9]', '', product_url)
         
         if product_only is not None and product_number not in product_only:
             continue
         
+        product_info_list.append([product_name, product_url])
+
         thumb_link = product_div.select_one("img")
         thumb_url = thumb_link.get("src")
         if not thumblist is None:
@@ -38,7 +42,7 @@ def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None
             if not shortlist is None:
                 shortlist.append(href)
             
-    return download_url_list
+    return download_url_list, product_info_list
 
 
 def download_item(download_number, filepath, cookie):
