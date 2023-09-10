@@ -321,6 +321,9 @@ if __name__ == "__main__":
         booth_cookie = {"_plaza_session_nktz7u": config_json['session-cookie']}
         discord_webhook_url = config_json['discord-webhook-url']
 
+        # Preference
+        image.font_init(config_json.get('changelog-font-file', 'NanumSquareNeo-bRg.ttf'), config_json.get('changelog-font-size', 16))
+
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")

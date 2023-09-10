@@ -1,7 +1,12 @@
 from PIL import Image, ImageFont, ImageDraw
 
+# TODO: WHAT HAPPENED WHEN FONT FILE DOES NOT EXIST?!?!?!?!?
 font = ImageFont.truetype('NanumSquareNeo-bRg.ttf', size=16)
 font_color = 'rgb(255, 255, 255)'
+
+def font_init(font_filename, size):
+    global font
+    font = ImageFont.truetype(font_filename, size)
 
 def print_img(img, current_string):
     draw = ImageDraw.Draw(img)

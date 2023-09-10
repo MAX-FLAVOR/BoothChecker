@@ -2,6 +2,9 @@
     "session-cookie": "YOUR_COOKIE_HERE",
     "discord-webhook-url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
 
+    "changelog-font-file":  "NanumSquareNeo-bRg.ttf",
+    "changelog-font-size": 16,
+
     "products":
     [
         {
