@@ -1,12 +1,15 @@
 # booth-update-checker
 
+[Docker Hub](https://hub.docker.com/r/wakamo/booth-update-checker)
+
+***
 ### Docker-Compose
 ```
 version: "3"
 
 services:
   booth-update-checker:
-    build: .
+    image: wakamo/booth-update-checker
     container_name: booth-update-checker
     volumes:
       - ./checklist.json:/root/booth-update-checker/checklist.json
