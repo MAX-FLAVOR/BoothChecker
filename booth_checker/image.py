@@ -1,8 +1,6 @@
 from PIL import Image, ImageFont, ImageDraw
 
-# TODO: WHAT HAPPENED WHEN FONT FILE DOES NOT EXIST?!?!?!?!?
-font = ImageFont.truetype('NanumSquareNeo-bRg.ttf', size=16)
-font_color = 'rgb(255, 255, 255)'
+# font = ImageFont.truetype('NanumSquareNeo-bRg.ttf', size=16)
 font_size = 16
 
 def font_init(font_filename, size):
