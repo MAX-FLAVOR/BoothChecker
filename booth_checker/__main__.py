@@ -84,18 +84,17 @@ def init_update_check(product):
         init_file_process(download_path, item[1], version_json, encoding)
         
     # create image from 'files' tree
-    global current_string, current_level, current_count, highest_level
-    
-    current_string = ""
+    global path_list, current_level, current_count, highest_level
+
+    path_list = []
     current_level = 0
     current_count = 0
     highest_level = 0
-    get_files_str(version_json)
+    init_pathinfo(version_json)
     
-    offset = image.get_offset(highest_level, current_count)
+    offset = image.get_image_size(highest_level, current_count)
     img = image.make_image(1024, offset[1])
-    image.print_img(img, current_string)
-    # img = img.resize(size=(2048, offset[1]))
+    image.make_pathinfo_line(img, path_list)
     img.save(changelog_img_path)
     
     # add webhook
@@ -128,13 +127,12 @@ def init_update_check(product):
     
     file.close()
 
-
-current_string = ""
+path_list = []
 current_level = 0
-current_count = 0
 highest_level = 0
-def get_files_str(root):
-    global current_string, current_level, current_count, highest_level
+current_count = 0
+def init_pathinfo(root):
+    global path_list, current_level, highest_level, current_count
     
     if highest_level < current_level:
         highest_level = current_level
@@ -146,27 +144,27 @@ def get_files_str(root):
     current_level += 1
     
     for file in files.keys():
-        filetree_str = ""
+        file_info = {'line_str': "", 'status': root['files'][file]['mark_as']}
 
         for loop in range(0, current_level - 1):
-            filetree_str += '        '
+            file_info['line_str'] += '        '
 
         symbol = ''
-        if root['files'][file]['mark_as'] == 1:
+        if file_info['status'] == 1:
             symbol = '(Added)'
-        elif root['files'][file]['mark_as'] == 2:
+        elif file_info['status'] == 2:
             symbol = '(Deleted)'
-        elif root['files'][file]['mark_as'] == 3:
+        elif file_info['status'] == 3:
             symbol = '(Changed)'
 
+        file_info['line_str'] += f'{file} {symbol}'
+
+        path_list.append(file_info)
         current_count += 1
-        filetree_str += f'{file} {symbol}'
-        current_string += filetree_str + '\n'
         
-        get_files_str(root['files'][file])
+        init_pathinfo(root['files'][file])
         
     current_level -= 1
-
 
 json_level = []
 def init_file_process(input_path, filename, version_json, encoding):
