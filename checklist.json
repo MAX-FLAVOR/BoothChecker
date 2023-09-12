@@ -8,6 +8,8 @@
     "products":
     [
         {
+            "custom-version-filename": "my-version",
+
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE",
             "booth-product-name": "BOOTH_PROUCT_NAME_HERE",
             "booth-check-only": [

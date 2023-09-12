@@ -44,7 +44,12 @@ def init_update_check(product):
 
     download_url_list = download_url_list[0]
 
-    version_file_path = f'./version/{order_num}.json'
+    version_filename = product.get('custom-version-filename')
+    if version_filename is None:
+        version_filename = order_num
+    
+    version_file_path = f'./version/{version_filename}.json'
+
     if not os.path.exists(version_file_path):
         print('version file not found')
         createVersionFile(version_file_path, order_num)
