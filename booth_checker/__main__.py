@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
 
+from log import *
 from shared import *
 import booth
 import image
@@ -51,8 +52,9 @@ def init_update_check(product):
     version_file_path = f'./version/{version_filename}.json'
 
     if not os.path.exists(version_file_path):
-        print('version file not found')
-        createVersionFile(version_file_path, order_num)
+        log_print(order_num, 'version file not found')
+        createVersionFile(version_file_path)
+        log_print(order_num, 'version file created')
     
     file = open(version_file_path, 'r+')    
     version_json = simdjson.load(file)
@@ -64,7 +66,7 @@ def init_update_check(product):
             or (local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]))):
         return
              
-    print(f'something has changed on {order_num}')
+    log_print(order_num, 'something has changed')
     
     # give 'marked_as' = 2 on all elements
     for local_file in version_json['files'].keys():
@@ -77,7 +79,7 @@ def init_update_check(product):
         # download stuff
         download_path = f'./download/{item[1]}'
         
-        print(f'downloading {item[0]} to {download_path}')
+        log_print(order_num, f'downloading {item[0]} to {download_path}')
         booth.download_item(item[0], download_path, booth_cookie)
         
         # archive stuff
@@ -85,7 +87,7 @@ def init_update_check(product):
             archive_path = archive_folder + '/' + item[1]
             shutil.copyfile(download_path, archive_path)
         
-        print('parsing its structure')
+        log_print(order_num, f'parsing {item[0]} structure')
         init_file_process(download_path, item[1], version_json, encoding)
         
     # create image from 'files' tree
@@ -305,7 +307,7 @@ def process_delete_keys(previous, root_name):
         
 
 if __name__ == "__main__":
-    global current_time, booth_cookie, discord_webhook_url
+    global booth_cookie, discord_webhook_url
 
     # 갱신 간격 (초)
     refresh_interval = 600
@@ -334,23 +336,24 @@ if __name__ == "__main__":
         createFolder("./download")
         createFolder("./process")
         
-        current_time = datetime.now().strftime('%Y-%m-%d %H %M')
+        current_time = strftime_now()
 
         for product in config_json['products']:
+            order_num = product['booth-order-number']
             # BOOTH Heartbeat
             # KT™ Sucks. Thank you.
+            
             try:
-                print('Checking BOOTH heartbeat')
+                log_print(order_num, 'Checking BOOTH heartbeat')
                 requests.get("https://booth.pm")
             except:
-                print('BOOTH heartbeat failed')
+                log_print(order_num, 'BOOTH heartbeat failed')
                 break
         
             try:
                 init_update_check(product)
             except PermissionError:
-                order_num = product['booth-order-number']
-                print(f'error occured on checking {order_num}')
+                log_print(order_num, 'error occured on checking')
             
         # 갱신 대기
         print("waiting for refresh")
