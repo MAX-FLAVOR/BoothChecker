@@ -68,9 +68,12 @@ def init_update_check(product):
              
     log_print(order_num, 'something has changed')
     
+    global saved_prehash
+    saved_prehash = {}
+    
     # give 'marked_as' = 2 on all elements
     for local_file in version_json['files'].keys():
-        element_mark(version_json['files'][local_file], 2)
+        element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
     
     archive_folder = f'./archive/{current_time}'
     os.makedirs(archive_folder, exist_ok=True)
@@ -139,7 +142,7 @@ current_level = 0
 highest_level = 0
 current_count = 0
 def init_pathinfo(root):
-    global path_list, current_level, highest_level, current_count
+    global path_list, current_level, highest_level, current_count, saved_prehash
     
     if highest_level < current_level:
         highest_level = current_level
@@ -164,7 +167,19 @@ def init_pathinfo(root):
         elif file_info['status'] == 3:
             symbol = '(Changed)'
 
-        file_info['line_str'] += f'{file} {symbol}'
+        hash = root['files'][file]['hash']
+        old_name = saved_prehash.get(hash, None)
+
+        # UM..
+        if old_name is not None:
+            if file_info['status'] == 2: 
+                continue
+            elif file != old_name:
+                file_info['line_str'] += f'{old_name} → {file} {symbol}'
+            else:
+                file_info['line_str'] += f'{file} {symbol}'
+        else:
+            file_info['line_str'] += f'{file} {symbol}'
 
         path_list.append(file_info)
         current_count += 1
@@ -174,6 +189,7 @@ def init_pathinfo(root):
     current_level -= 1
 
 json_level = []
+saved_prehash = {}
 def init_file_process(input_path, filename, version_json, encoding):
     json_level.append(filename)
     
@@ -274,15 +290,20 @@ def calc_file_hash(path):
     return hash
 
 
-def element_mark(root, mark_as): 
+def element_mark(root, mark_as, current_filename, prehash_dict): 
     root['mark_as'] = mark_as
+
+    hash = root['hash']
+    if (prehash_dict is not None and hash is not None
+        and hash != 'DIRECTORY'):
+        prehash_dict[hash] = current_filename
 
     files = root.get('files', None)
     if files is None:
         return
         
     for file in files.keys():
-        element_mark(root['files'][file], mark_as)
+        element_mark(root['files'][file], mark_as, file, prehash_dict)
 
 delete_keys = []
 def remove_element_mark(previous, root, root_name):
