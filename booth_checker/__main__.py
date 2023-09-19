@@ -175,6 +175,7 @@ def init_pathinfo(root):
             if file_info['status'] == 2: 
                 continue
             elif file != old_name:
+                file_info['status'] = 0
                 file_info['line_str'] += f'{old_name} → {file} {symbol}'
             else:
                 file_info['line_str'] += f'{file} {symbol}'
