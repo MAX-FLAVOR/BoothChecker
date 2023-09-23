@@ -2,9 +2,14 @@
     "session-cookie": "YOUR_COOKIE_HERE",
     "discord-webhook-url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
 
+    "changelog-font-file":  "NanumSquareNeo-bRg.ttf",
+    "changelog-font-size": 16,
+
     "products":
     [
         {
+            "custom-version-filename": "my-version",
+
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE",
             "booth-product-name": "BOOTH_PROUCT_NAME_HERE",
             "booth-check-only": [

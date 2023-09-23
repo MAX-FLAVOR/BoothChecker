@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
 
+from log import *
 from shared import *
 import booth
 import image
@@ -32,6 +33,7 @@ def init_update_check(product):
     encoding = product.get('intent-encoding')
     number_show = product.get('download-number-show')
     changelog_show = product.get('changelog-show')
+    archive_this = product.get('archive_this', True)
             
     download_short_list = list()
     thumblist = list()
@@ -43,10 +45,16 @@ def init_update_check(product):
 
     download_url_list = download_url_list[0]
 
-    version_file_path = f'./version/{order_num}.json'
+    version_filename = product.get('custom-version-filename')
+    if version_filename is None:
+        version_filename = order_num
+    
+    version_file_path = f'./version/{version_filename}.json'
+
     if not os.path.exists(version_file_path):
-        print('version file not found')
-        createVersionFile(version_file_path, order_num)
+        log_print(order_num, 'version file not found')
+        createVersionFile(version_file_path)
+        log_print(order_num, 'version file created')
     
     file = open(version_file_path, 'r+')    
     version_json = simdjson.load(file)
@@ -58,11 +66,14 @@ def init_update_check(product):
             or (local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]))):
         return
              
-    print(f'something has changed on {order_num}')
+    log_print(order_num, 'something has changed')
+    
+    global saved_prehash
+    saved_prehash = {}
     
     # give 'marked_as' = 2 on all elements
     for local_file in version_json['files'].keys():
-        element_mark(version_json['files'][local_file], 2)
+        element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
     
     archive_folder = f'./archive/{current_time}'
     os.makedirs(archive_folder, exist_ok=True)
@@ -71,30 +82,29 @@ def init_update_check(product):
         # download stuff
         download_path = f'./download/{item[1]}'
         
-        print(f'downloading {item[0]} to {download_path}')
+        log_print(order_num, f'downloading {item[0]} to {download_path}')
         booth.download_item(item[0], download_path, booth_cookie)
         
         # archive stuff
-        if (item[0] not in local_list):
+        if archive_this and item[0] not in local_list:
             archive_path = archive_folder + '/' + item[1]
             shutil.copyfile(download_path, archive_path)
         
-        print('parsing its structure')
+        log_print(order_num, f'parsing {item[0]} structure')
         init_file_process(download_path, item[1], version_json, encoding)
         
     # create image from 'files' tree
-    global current_string, current_level, current_count, highest_level
-    
-    current_string = ""
+    global path_list, current_level, current_count, highest_level
+
+    path_list = []
     current_level = 0
     current_count = 0
     highest_level = 0
-    get_files_str(version_json)
+    init_pathinfo(version_json)
     
-    offset = image.get_offset(highest_level, current_count)
+    offset = image.get_image_size(highest_level, current_count)
     img = image.make_image(1024, offset[1])
-    image.print_img(img, current_string)
-    # img = img.resize(size=(2048, offset[1]))
+    image.make_pathinfo_line(img, path_list)
     img.save(changelog_img_path)
     
     # add webhook
@@ -127,13 +137,12 @@ def init_update_check(product):
     
     file.close()
 
-
-current_string = ""
+path_list = []
 current_level = 0
-current_count = 0
 highest_level = 0
-def get_files_str(root):
-    global current_string, current_level, current_count, highest_level
+current_count = 0
+def init_pathinfo(root):
+    global path_list, current_level, highest_level, current_count, saved_prehash
     
     if highest_level < current_level:
         highest_level = current_level
@@ -145,29 +154,43 @@ def get_files_str(root):
     current_level += 1
     
     for file in files.keys():
-        filetree_str = ""
+        file_info = {'line_str': "", 'status': root['files'][file]['mark_as']}
 
         for loop in range(0, current_level - 1):
-            filetree_str += '        '
+            file_info['line_str'] += '        '
 
         symbol = ''
-        if root['files'][file]['mark_as'] == 1:
+        if file_info['status'] == 1:
             symbol = '(Added)'
-        elif root['files'][file]['mark_as'] == 2:
+        elif file_info['status'] == 2:
             symbol = '(Deleted)'
-        elif root['files'][file]['mark_as'] == 3:
+        elif file_info['status'] == 3:
             symbol = '(Changed)'
 
+        hash = root['files'][file]['hash']
+        old_name = saved_prehash.get(hash, None)
+
+        # UM..
+        if old_name is not None:
+            if file_info['status'] == 2: 
+                continue
+            elif file != old_name:
+                file_info['status'] = 0
+                file_info['line_str'] += f'{old_name} → {file} {symbol}'
+            else:
+                file_info['line_str'] += f'{file} {symbol}'
+        else:
+            file_info['line_str'] += f'{file} {symbol}'
+
+        path_list.append(file_info)
         current_count += 1
-        filetree_str += f'{file} {symbol}'
-        current_string += filetree_str + '\n'
         
-        get_files_str(root['files'][file])
+        init_pathinfo(root['files'][file])
         
     current_level -= 1
 
-
 json_level = []
+saved_prehash = {}
 def init_file_process(input_path, filename, version_json, encoding):
     json_level.append(filename)
     
@@ -268,15 +291,20 @@ def calc_file_hash(path):
     return hash
 
 
-def element_mark(root, mark_as): 
+def element_mark(root, mark_as, current_filename, prehash_dict): 
     root['mark_as'] = mark_as
+
+    hash = root['hash']
+    if (prehash_dict is not None and hash is not None
+        and hash != 'DIRECTORY'):
+        prehash_dict[hash] = current_filename
 
     files = root.get('files', None)
     if files is None:
         return
         
     for file in files.keys():
-        element_mark(root['files'][file], mark_as)
+        element_mark(root['files'][file], mark_as, file, prehash_dict)
 
 delete_keys = []
 def remove_element_mark(previous, root, root_name):
@@ -301,7 +329,7 @@ def process_delete_keys(previous, root_name):
         
 
 if __name__ == "__main__":
-    global current_time, booth_cookie, discord_webhook_url
+    global booth_cookie, discord_webhook_url
 
     # 갱신 간격 (초)
     refresh_interval = 600
@@ -320,6 +348,9 @@ if __name__ == "__main__":
         booth_cookie = {"_plaza_session_nktz7u": config_json['session-cookie']}
         discord_webhook_url = config_json['discord-webhook-url']
 
+        # Preference
+        image.font_init(config_json.get('changelog-font-file', 'NanumSquareNeo-bRg.ttf'), config_json.get('changelog-font-size', 16))
+
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")
@@ -327,23 +358,24 @@ if __name__ == "__main__":
         createFolder("./download")
         createFolder("./process")
         
-        current_time = datetime.now().strftime('%Y-%m-%d %H %M')
+        current_time = strftime_now()
 
         for product in config_json['products']:
+            order_num = product['booth-order-number']
             # BOOTH Heartbeat
             # KT™ Sucks. Thank you.
+            
             try:
-                print('Checking BOOTH heartbeat')
+                log_print(order_num, 'Checking BOOTH heartbeat')
                 requests.get("https://booth.pm")
             except:
-                print('BOOTH heartbeat failed')
+                log_print(order_num, 'BOOTH heartbeat failed')
                 break
         
             try:
                 init_update_check(product)
             except PermissionError:
-                order_num = product['booth-order-number']
-                print(f'error occured on checking {order_num}')
+                log_print(order_num, 'error occured on checking')
             
         # 갱신 대기
         print("waiting for refresh")

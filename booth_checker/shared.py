@@ -3,7 +3,7 @@ import simdjson
 
 changelog_img_path = 'changelog_temp.png'
 
-def createVersionFile(version_file_path, order_num):
+def createVersionFile(version_file_path):
     f = open(version_file_path, 'w')
     
     short_list = {'short-list': [], 'files': {}}
@@ -14,8 +14,6 @@ def createVersionFile(version_file_path, order_num):
     
     simdjson.dump(short_list, fp = f, indent = 4)
     f.close()
-    
-    print(f'{order_num} version file created')
     
     
 def createFolder(directory):
