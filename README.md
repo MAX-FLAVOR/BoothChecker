@@ -44,7 +44,8 @@ services:
             ],
             "intent-encoding": "utf-8",
             "download-number-show": false,
-            "changelog-show": true
+            "changelog-show": true,
+            "archive_this": true
         },
         {
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE"
@@ -87,6 +88,9 @@ Discord Webhook에 아이템 다운로드 번호를 표시할지 설정할 수 �
 
 Discord Webhook에 체인지로그 이미지를 표시할지 설정할 수 있습니다.
 
+`archive_this` (Default : `true`)
+
+해당 아이템을 archive 폴더에 저장할지 설정할 수 있습니다.
 
 ---
 ### Font

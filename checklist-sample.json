@@ -17,7 +17,8 @@
             ],
             "intent-encoding": "shift_jis",
             "download-number-show": false,
-            "changelog-show": false
+            "changelog-show": false,
+            "archive_this": true
         },
         {
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE"
