@@ -85,6 +85,6 @@ Discord 알림에 체인지로그 이미지를 표시할지 설정할 수 있습
 
 ---
 ### Font
-이 프로젝트에는 네이버에서 제공한 나눔글꼴이 적용되어 있습니다.
+`JetBrains Mono`
 
-https://help.naver.com/service/30016/contents/18088?osType=PC&lang=ko
+https://www.jetbrains.com/lp/mono/

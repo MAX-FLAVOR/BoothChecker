@@ -3,29 +3,34 @@ from PIL import Image, ImageFont, ImageDraw
 # font = ImageFont.truetype('NanumSquareNeo-bRg.ttf', size=16)
 font_size = 16
 
-def font_init(font_filename, size):
+def font_init(size):
     global font, font_size
 
     font_size = size
-    font = ImageFont.truetype(font_filename, size)
+    font = ImageFont.truetype("JetBrainsMono-Bold.ttf", size)
 
 def print_line(img, order, status, current_string):
     global font
 
+    # Status 
+    # 1 = Added
+    # 2 = Deleted
+    # 3 = Changed 
+
     line_color = 'rgb(255, 255, 255)'
     if status == 1:
-        line_color = 'rgb(3, 166, 166)'
+        line_color = 'rgb(125, 164, 68)'
     elif status == 2:
-        line_color = 'rgb(242, 53, 123)'
+        line_color = 'rgb(252, 101, 89)'
     elif status == 3:
-        line_color = 'rgb(242, 174, 46)'
+        line_color = 'rgb(128, 161, 209)'
 
     draw = ImageDraw.Draw(img)
     draw.text((0, get_line_yoffset(order)), current_string, font=font, fill=line_color)
     
 
 def make_image(x, y):
-    image = Image.new('RGB', (x, y), color = 'rgb(54, 57, 63)')
+    image = Image.new('RGB', (x, y), color = 'rgb(41, 37, 41)')
     return image
 
 

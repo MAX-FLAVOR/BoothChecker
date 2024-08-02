@@ -1,11 +1,12 @@
 .DS_Store
 
 __pycache__/
-/download/
-/process/
-/version/
-/archive/
+download/
+process/
+version/
+archive/
 
+.devcontainer
 *.code-workspace
 *.png
-*-test.*
+checklist.json

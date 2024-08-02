@@ -1,5 +1,7 @@
 import requests
 import simdjson
+from pytz import timezone
+from datetime import datetime
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from shared import changelog_img_path
@@ -22,7 +24,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
         "embeds": [
             {
                 "title": name,
-                "description": "BOOTH 업데이트 발견!",
+                "description": "업데이트 발견!",
                 "color": 65280,
                 "fields": fields,
                 "author": {
@@ -36,7 +38,8 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
                 "thumbnail": {
                     "url": thumb
                 },
-                "url": url
+                "url": url,
+                "timestamp": datetime.now(timezone('Asia/Seoul')).isoformat()
             }
         ]
     }
@@ -49,7 +52,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
             "color": 65280,
             "image": {
                 "url": f'attachment://{changelog_img_path}'
-            }
+            },
         })
         payload["attachments"] = [
             {
