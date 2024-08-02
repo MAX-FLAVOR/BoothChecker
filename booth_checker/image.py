@@ -12,25 +12,25 @@ def font_init(size):
 def print_line(img, order, status, current_string):
     global font
 
-    # status 
+    # Status 
     # 1 = Added
     # 2 = Deleted
     # 3 = Changed 
 
     line_color = 'rgb(255, 255, 255)'
     if status == 1:
-        line_color = 'rgb(29, 66, 37)'
+        line_color = 'rgb(125, 164, 68)'
     elif status == 2:
-        line_color = 'rgb(84, 35, 35)'
+        line_color = 'rgb(252, 101, 89)'
     elif status == 3:
-        line_color = 'rgb(28, 63, 113)'
+        line_color = 'rgb(128, 161, 209)'
 
     draw = ImageDraw.Draw(img)
     draw.text((0, get_line_yoffset(order)), current_string, font=font, fill=line_color)
     
 
 def make_image(x, y):
-    image = Image.new('RGB', (x, y), color = 'rgb(15, 18, 22)')
+    image = Image.new('RGB', (x, y), color = 'rgb(41, 37, 41)')
     return image
 
 
@@ -49,5 +49,5 @@ def get_line_yoffset(count):
 
 def get_image_size(level, count):
     x_offset = 64 * level
-    y_offset = (font_size + 4) * count
+    y_offset = 20 * count
     return (x_offset, y_offset)

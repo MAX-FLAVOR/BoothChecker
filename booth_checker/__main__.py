@@ -107,7 +107,7 @@ def init_update_check(product):
     init_pathinfo(version_json)
     
     offset = image.get_image_size(highest_level, current_count)
-    img = image.make_image(1024, offset[1])
+    img = image.make_image(2048, offset[1])
     image.make_pathinfo_line(img, path_list)
     img.save(changelog_img_path)
     
