@@ -4,3 +4,4 @@ beautifulsoup4
 pysimdjson
 unitypackage_extractor
 Pillow
+pytz

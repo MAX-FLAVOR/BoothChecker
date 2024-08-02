@@ -1,5 +1,6 @@
 import requests
 import simdjson
+from pytz import timezone
 from datetime import datetime
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
@@ -37,7 +38,8 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
                 "thumbnail": {
                     "url": thumb
                 },
-                "url": url
+                "url": url,
+                "timestamp": datetime.now(timezone('Asia/Seoul')).isoformat()
             }
         ]
     }
@@ -51,7 +53,6 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
             "image": {
                 "url": f'attachment://{changelog_img_path}'
             },
-            "timestamp": datetime.utcnow() + datetime.timedelta(hours=9)
         })
         payload["attachments"] = [
             {
