@@ -1,4 +1,4 @@
-name: main Docker Image CI
+name: docker-build-push
 
 on:
   push:
