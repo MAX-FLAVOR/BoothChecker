@@ -79,37 +79,38 @@ def init_update_check(product):
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
     
-    archive_folder = f'./archive/{current_time}'
-    os.makedirs(archive_folder, exist_ok=True)
-    
     for item in download_url_list: 
         # download stuff
         download_path = f'./download/{item[1]}'
         
-        log_print(order_num, f'downloading {item[0]} to {download_path}')
-        booth.download_item(item[0], download_path, booth_cookie)
+        if changelog_show is True and archive_this is True:
+            log_print(order_num, f'downloading {item[0]} to {download_path}')
+            booth.download_item(item[0], download_path, booth_cookie)
         
         # archive stuff
         if archive_this and item[0] not in local_list:
+            archive_folder = f'./archive/{current_time}'
+            os.makedirs(archive_folder, exist_ok=True)
             archive_path = archive_folder + '/' + item[1]
             shutil.copyfile(download_path, archive_path)
         
-        log_print(order_num, f'parsing {item[0]} structure')
-        init_file_process(download_path, item[1], version_json, encoding)
+        if changelog_show is True:
+            log_print(order_num, f'parsing {item[0]} structure')
+            init_file_process(download_path, item[1], version_json, encoding)
         
-    # create image from 'files' tree
-    global path_list, current_level, current_count, highest_level
+            # create image from 'files' tree
+            global path_list, current_level, current_count, highest_level
 
-    path_list = []
-    current_level = 0
-    current_count = 0
-    highest_level = 0
-    init_pathinfo(version_json)
-    
-    offset = image.get_image_size(highest_level, current_count)
-    img = image.make_image(2048, offset[1])
-    image.make_pathinfo_line(img, path_list)
-    img.save(changelog_img_path)
+            path_list = []
+            current_level = 0
+            current_count = 0
+            highest_level = 0
+            init_pathinfo(version_json)
+            
+            offset = image.get_image_size(highest_level, current_count)
+            img = image.make_image(2048, offset[1])
+            image.make_pathinfo_line(img, path_list)
+            img.save(changelog_img_path)
     
     # add webhook
     author_info = booth.crawling_product(url)
@@ -122,7 +123,8 @@ def init_update_check(product):
         
     discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb, number_show, changelog_show)
     
-    os.remove(changelog_img_path)
+    if changelog_show is True:
+        os.remove(changelog_img_path)
     
     # delete all of 'marked_as'
     global delete_keys
