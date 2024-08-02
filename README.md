@@ -1,5 +1,7 @@
 # booth-update-checker
 
+[![docker-build-push](https://github.com/5ignal/booth-update-checker/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/5ignal/booth-update-checker/actions/workflows/docker-build-push.yml)
+
 [Docker Hub](https://hub.docker.com/r/ogunarmaya/booth-update-checker)
 
 ***
