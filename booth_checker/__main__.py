@@ -353,7 +353,7 @@ if __name__ == "__main__":
         discord_webhook_url = config_json['discord-webhook-url']
 
         # Preference
-        image.font_init(config_json.get('changelog-font-file', 'NanumSquareNeo-bRg.ttf'), config_json.get('changelog-font-size', 16))
+        image.font_init(config_json.get('changelog-font-size', 16))
 
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")

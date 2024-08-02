@@ -3,11 +3,11 @@ from PIL import Image, ImageFont, ImageDraw
 # font = ImageFont.truetype('NanumSquareNeo-bRg.ttf', size=16)
 font_size = 16
 
-def font_init(font_filename, size):
+def font_init(size):
     global font, font_size
 
     font_size = size
-    font = ImageFont.truetype(font_filename, size)
+    font = ImageFont.truetype("JetBrainsMono-Bold.ttf", size)
 
 def print_line(img, order, status, current_string):
     global font
