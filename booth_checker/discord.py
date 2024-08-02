@@ -1,6 +1,6 @@
 import requests
 import simdjson
-import datetime
+from datetime import datetime
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
 from shared import changelog_img_path
