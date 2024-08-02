@@ -12,20 +12,25 @@ def font_init(size):
 def print_line(img, order, status, current_string):
     global font
 
+    # status 
+    # 1 = Added
+    # 2 = Deleted
+    # 3 = Changed 
+
     line_color = 'rgb(255, 255, 255)'
     if status == 1:
-        line_color = 'rgb(3, 166, 166)'
+        line_color = 'rgb(29, 66, 37)'
     elif status == 2:
-        line_color = 'rgb(242, 53, 123)'
+        line_color = 'rgb(84, 35, 35)'
     elif status == 3:
-        line_color = 'rgb(242, 174, 46)'
+        line_color = 'rgb(28, 63, 113)'
 
     draw = ImageDraw.Draw(img)
     draw.text((0, get_line_yoffset(order)), current_string, font=font, fill=line_color)
     
 
 def make_image(x, y):
-    image = Image.new('RGB', (x, y), color = 'rgb(54, 57, 63)')
+    image = Image.new('RGB', (x, y), color = 'rgb(15, 18, 22)')
     return image
 
 
