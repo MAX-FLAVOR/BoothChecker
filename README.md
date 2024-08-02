@@ -1,6 +1,6 @@
 # booth-update-checker
 
-[Docker Hub](https://hub.docker.com/r/wakamo/booth-update-checker)
+[Docker Hub](https://hub.docker.com/r/ogunarmaya/booth-update-checker)
 
 ***
 ### Docker-Compose
@@ -9,36 +9,40 @@ version: "3"
 
 services:
   booth-update-checker:
-    image: wakamo/booth-update-checker
+    image: ogunarmaya/booth-update-checker:dev
     container_name: booth-update-checker
     volumes:
       - ./checklist.json:/root/booth-update-checker/checklist.json
       - ./version:/root/booth-update-checker/version
+      - ./archive:/root/booth-update-checker/archive
     restart: unless-stopped
 ```
 
 ---
 
-### Checklist Configuration
+### Checklist
 
-`checklist.json`
 ```
 {
     "session-cookie": "YOUR_COOKIE_HERE",
     "discord-webhook-url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
 
+    "changelog-font-size": 16,
+
     "products":
     [
         {
-            "booth-order-number": "BOOTH_ORDER_NUMBER_HERE",
+            "custom-version-filename": "my-version",
+
+            "booth-order-number": "BOOTH_ORDER_NUMBER_HERE (Required)",
             "booth-product-name": "BOOTH_PROUCT_NAME_HERE",
             "booth-check-only": [
                 "ITEM_NUMBER_1",
                 "ITEM_NUMBER_2"
             ],
-            "intent-encoding": "shift_jis",
+            "intent-encoding": "utf-8",
             "download-number-show": false,
-            "changelog-show": false
+            "changelog-show": true
         },
         {
             "booth-order-number": "BOOTH_ORDER_NUMBER_HERE"
@@ -49,13 +53,11 @@ services:
 
 ### 옵션
 
-booth-order-number를 제외한 나머지는 옵션입니다.
-
 `booth-product-name`
 
 아이템의 이름을 지정할 수 있습니다.
 
-지정을 안하면 아이템 페이지의 이름을 가져옵니다.
+Default : 아이템 페이지의 제목
 
 `booth-check-only`
 
@@ -65,23 +67,20 @@ booth-order-number를 제외한 나머지는 옵션입니다.
 
 `intent-encoding`
 
+- Japanese: shift_jis
+- Korean: ks_c_5601-1987
+- UTF-8: utf-8
+
 Reference: https://learn.microsoft.com/ko-kr/windows/win32/intl/code-page-identifiers
-- Chinese Simplified: 936 (gb2312)
-- Japanese: 932 (shift_jis)
-- Korean: 949 (ks_c_5601-1987)
-- UTF-8: 65001 (utf-8)
 
-`download-number-show`
+`download-number-show` (Default : `true`)
 
-Discord 알림에 다운로드 넘버를 표시할지 설정할 수 있습니다.
+Discord Webhook에 아이템 다운로드 번호를 표시할지 설정할 수 있습니다.
 
-기본 값은 true입니다.
+`changelog-show` (Default : `true`)
 
-`changelog-show`
+Discord Webhook에 체인지로그 이미지를 표시할지 설정할 수 있습니다.
 
-Discord 알림에 체인지로그 이미지를 표시할지 설정할 수 있습니다.
-
-기본 값은 true입니다.
 
 ---
 ### Font
