@@ -11,7 +11,7 @@ version: "3"
 
 services:
   booth-update-checker:
-    image: ogunarmaya/booth-update-checker:dev
+    image: ogunarmaya/booth-update-checker:latest
     container_name: booth-update-checker
     volumes:
       - ./checklist.json:/root/booth-update-checker/checklist.json
@@ -54,6 +54,10 @@ services:
 ```
 
 ### 옵션
+
+`custom-version-filename`
+
+버전 파일의 이름을 지정할 수 있습니다.
 
 `booth-product-name`
 

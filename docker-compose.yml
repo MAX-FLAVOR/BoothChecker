@@ -2,7 +2,7 @@ version: "3"
 
 services:
   booth-update-checker:
-    image: ogunarmaya/booth-update-checker:dev
+    image: ogunarmaya/booth-update-checker:latest
     container_name: booth-update-checker
     volumes:
       - ./checklist.json:/root/booth-update-checker/checklist.json
