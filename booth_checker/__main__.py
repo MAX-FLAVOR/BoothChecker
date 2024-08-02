@@ -68,6 +68,7 @@ def init_update_check(product):
              
     if (length_hint(download_short_list) == 0):
         log_print(order_num, 'BOOTH no responding')
+        return
     else:
         log_print(order_num, 'something has changed')
     
