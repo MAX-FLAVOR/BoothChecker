@@ -26,6 +26,7 @@ services:
 
 ```
 {
+    "refresh-interval": 600,
     "session-cookie": "YOUR_COOKIE_HERE",
     "discord-webhook-url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
 
@@ -55,6 +56,14 @@ services:
 ```
 
 ### 옵션
+
+`refresh-interval` `Required`
+
+업데이트 확인 주기을 입력합니다. (초)
+
+`booth-order-number` `Required`
+
+BOOTH Order Detail 페이지에서 확인할 수 있는 Order Number를 입력합니다.
 
 `custom-version-filename`
 
