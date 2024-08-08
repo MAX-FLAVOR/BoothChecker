@@ -56,8 +56,13 @@ def init_update_check(product):
         createVersionFile(version_file_path)
         log_print(order_num, 'version file created')
     
-    file = open(version_file_path, 'r+')    
-    version_json = simdjson.load(file)
+    file = open(version_file_path, 'r+')
+    try:
+        version_json = simdjson.load(file)
+    except:
+        log_print(order_num, 'corrupted version file')
+        createVersionFile(version_file_path)
+        version_json = simdjson.load(file)
     
     local_list = version_json['short-list'] 
 
