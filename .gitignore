@@ -5,8 +5,8 @@ download/
 process/
 version/
 archive/
+checklist.json
 
-.devcontainer
 *.code-workspace
 *.png
-checklist.json
+*.zip
