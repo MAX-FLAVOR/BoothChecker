@@ -83,7 +83,7 @@ def init_update_check(product):
         # download stuff
         download_path = f'./download/{item[1]}'
         
-        if changelog_show is True and archive_this is True:
+        if changelog_show is True or archive_this is True:
             log_print(order_num, f'downloading {item[0]} to {download_path}')
             booth.download_item(item[0], download_path, booth_cookie)
         
