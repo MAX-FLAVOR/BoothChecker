@@ -49,5 +49,5 @@ def get_line_yoffset(count):
 
 def get_image_size(level, count):
     x_offset = 64 * level
-    y_offset = 20 * count
+    y_offset = 22 * count
     return (x_offset, y_offset)
