@@ -4,7 +4,7 @@ def font_init(size):
     global font, font_size
 
     font_size = size
-    font = ImageFont.truetype("JetBrainsMono-Bold.ttf", size)
+    font = ImageFont.truetype("./fonts/JetBrainsMono-Bold.ttf", size)
 
 def print_line(img, order, status, current_string):
     global font
