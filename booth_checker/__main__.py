@@ -341,9 +341,6 @@ def process_delete_keys(previous, root_name):
 
 if __name__ == "__main__":
     global booth_cookie, discord_webhook_url
-
-    # 갱신 간격 (초)
-    refresh_interval = 600
     
     createFolder("./version")
     createFolder("./archive")
@@ -354,6 +351,9 @@ if __name__ == "__main__":
         config_json = {}
         with open("checklist.json") as file:
             config_json = simdjson.load(file)
+
+        # 갱신 간격 (초)
+        refresh_interval = config_json['refresh-interval']
             
         # 계정
         booth_cookie = {"_plaza_session_nktz7u": config_json['session-cookie']}
