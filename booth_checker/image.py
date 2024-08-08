@@ -1,8 +1,5 @@
 from PIL import Image, ImageFont, ImageDraw
 
-# font = ImageFont.truetype('NanumSquareNeo-bRg.ttf', size=16)
-font_size = 16
-
 def font_init(size):
     global font, font_size
 
