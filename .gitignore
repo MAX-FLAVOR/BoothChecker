@@ -10,3 +10,4 @@ checklist.json
 *.code-workspace
 *.png
 *.zip
+*.unitypackage
