@@ -60,7 +60,7 @@ def init_update_check(product):
     try:
         version_json = simdjson.load(file)
     except:
-        log_print(order_num, 'corrupted version file')
+        log_print(order_num, 'version file corrupted')
         createVersionFile(version_file_path)
         version_json = simdjson.load(file)
     
