@@ -23,7 +23,7 @@ def print_line(img, order, status, current_string):
         line_color = 'rgb(128, 161, 209)'
 
     draw = ImageDraw.Draw(img)
-    draw.text((0, get_line_yoffset(order)), current_string, font=font, fill=line_color)
+    draw.text((0, get_image_size(0, order)[1]), current_string, font=font, fill=line_color)
     
 
 def make_image(x, y):
@@ -36,13 +36,6 @@ def make_pathinfo_line(img, path_list):
     for pathinfo in path_list:
         print_line(img, current_order, pathinfo['status'], pathinfo['line_str'])
         current_order += 1
-
-def get_line_yoffset(count):
-    global font_size
-    
-    # x_offset = 64 * level
-    y_offset = (font_size + 4) * count
-    return y_offset
 
 def get_image_size(level, count):
     global font_size
