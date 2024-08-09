@@ -45,6 +45,7 @@ def get_line_yoffset(count):
     return y_offset
 
 def get_image_size(level, count):
+    global font_size
     x_offset = 64 * level
-    y_offset = 22 * count
+    y_offset = (font_size + 4) * count
     return (x_offset, y_offset)
