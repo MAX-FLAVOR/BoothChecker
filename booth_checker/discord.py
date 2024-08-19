@@ -18,49 +18,36 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
     else:
         author_name = ""
         author_icon = ""
-    
-    payload = {
-        "content": "@here",
-        "embeds": [
-            {
-                "title": name,
-                "description": "업데이트 발견!",
-                "color": 65280,
-                "fields": fields,
-                "author": {
-                    "name": author_name,
-                    "icon_url": author_icon
-                },
-                "footer": {
-                    "icon_url": "https://booth.pm/static-images/pwa/icon_size_128.png",
-                    "text": "BOOTH.pm"
-                },
-                "thumbnail": {
-                    "url": thumb
-                },
-                "url": url,
-                "timestamp": datetime.now(timezone('Asia/Seoul')).isoformat()
-            }
-        ]
-    }
+
+    payload = dict()
+    payload["content"] = "@here"
+    payload["embeds"] = list()
+    payload["fields"] = fields
+    payload_embed = dict()
+    payload_embed["title"] = name
+    payload_embed["color"] = 65280
+    payload_embed["author"] = dict([("name", author_name), ("icon_url", author_icon)])
+    payload_embed["description"] = "업데이트 발견! "
+    payload_embed["footer"] = dict([("text", "BOOTH.pm"), ("icon_url", "https://booth.pm/static-images/pwa/icon_size_128.png")])
+    payload_embed["thumbnail"] = dict([("url", thumb)])
+    payload_embed["url"] = url
+    payload_embed["timestamp"] = datetime.now(timezone('Asia/Seoul')).isoformat()
+    payload["embeds"].append(payload_embed)
 
     fields = dict()
     
     if changelog_show is not False:
-        payload["embeds"].append({
-            "title": "CHANGELOG",
-            "color": 65280,
-            "image": {
-                "url": f'attachment://{changelog_img_path}'
-            },
-        })
-        payload["attachments"] = [
-            {
-                "id": 0,
-                "description": "BOOTH Download Changelog",
-                "filename": changelog_img_path
-            }
-        ]
+        payload_embed_changelog = dict()
+        payload_embed_changelog["title"] = "CHANGELOG"
+        payload_embed_changelog["color"] = 65280
+        payload_embed_changelog["image"] = dict([("url", f'attachment://{changelog_img_path}')])
+        payload["embeds"].append(payload_embed_changelog)
+
+        payload_attachments = dict()
+        payload_attachments["id"] = 0
+        payload_attachments["description"] = "BOOTH Download Changelog"
+        payload_attachments["filename"] = changelog_img_path
+        payload["attachments"] = [payload_attachments]
         fields["files[0]"] = (changelog_img_path, open(changelog_img_path, 'rb'), 'image/png')
 
     # This convert dict to string with keep double quote like: "content": "@here"
