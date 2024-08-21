@@ -7,8 +7,6 @@
 ***
 ### Docker-Compose
 ```
-version: "3"
-
 services:
   booth-update-checker:
     image: ogunarmaya/booth-update-checker:latest
