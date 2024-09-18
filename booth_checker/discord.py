@@ -4,9 +4,9 @@ from pytz import timezone
 from datetime import datetime
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
-from shared import changelog_img_path
+from shared import changelog_html_path
 
-def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb, number_show, changelog_show):
+def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb, number_show, changelog_show, s3_upload_file):
     fields = list()
     if number_show is not False:
         fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
@@ -37,18 +37,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
     fields = dict()
     
     if changelog_show is not False:
-        payload_embed_changelog = dict()
-        payload_embed_changelog["title"] = "CHANGELOG"
-        payload_embed_changelog["color"] = 65280
-        payload_embed_changelog["image"] = dict([("url", f'attachment://{changelog_img_path}')])
-        payload["embeds"].append(payload_embed_changelog)
-
-        payload_attachments = dict()
-        payload_attachments["id"] = 0
-        payload_attachments["description"] = "BOOTH Download Changelog"
-        payload_attachments["filename"] = changelog_img_path
-        payload["attachments"] = [payload_attachments]
-        fields["files[0]"] = (changelog_img_path, open(changelog_img_path, 'rb'), 'image/png')
+        payload_embed["description"] = f'# 업데이트 발견! \n ## [변경사항 보기]({s3_upload_file})'
 
     # This convert dict to string with keep double quote like: "content": "@here"
     payload_str = simdjson.dumps(payload)

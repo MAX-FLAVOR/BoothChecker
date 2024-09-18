@@ -5,3 +5,4 @@ pysimdjson
 unitypackage_extractor
 Pillow
 pytz
+boto3
