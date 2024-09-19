@@ -2,8 +2,11 @@
     "refresh-interval": 600,
     "session-cookie": "YOUR_COOKIE_HERE",
     "discord-webhook-url": "YOUR_DISCORD_WEBHOOK_URL_HERE",
-
-    "changelog-font-size": 16,
+    "s3-endpoint-url": "YOUR_S3_ENDPOINT_ULR_HERE",
+    "s3-access-key-id": "YOUR_S3_ACCESS_KEY_ID_HERE",
+    "s3-secret-access-key": "YOUR_S3_SECRET_ACCESS_KEY_HERE",
+    "s3-bucket-name": "YOUR_S3_BUCKET_NAME_HERE",
+    "s3-url": "YOUR_S3_URL_HERE",
 
     "products":
     [
