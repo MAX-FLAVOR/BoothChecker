@@ -210,18 +210,19 @@ def init_update_check(product):
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Changelog</title>
                 <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500&display=swap');
+                    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Noto+Sans+JP&family=Noto+Sans+KR&display=swap');
                     body {{
-                        font-family: 'Zen Maru Gothic', serif;
-                        font-weight: 500;
-                        font-size: 14px;
+                        font-family: "JetBrains Mono", monospace, "Noto Sans JP", sans-serif, "Noto Sans KR", sans-serif;
+                        font-weight: 400;
+                        font-style: normal;
+                        font-size: 16px;
                         line-height: 1.6;
                         background-color: #1e1e1e;
-                        color: #ffffff;  /* 기본 텍스트 색상 */
+                        color: #ffffff;
                     }}
                     h1 {{
                         font-size: 24px;
-                        font-weight: bold;
+                        font-weight: 700;
                     }}
                     ul {{
                         list-style-type: disc;
