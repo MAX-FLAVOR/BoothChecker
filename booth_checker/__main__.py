@@ -2,6 +2,7 @@ import shutil
 import zipfile
 import hashlib
 import requests
+import uuid
 
 from time import sleep
 from datetime import datetime
@@ -254,9 +255,10 @@ def init_update_check(product):
     if length_hint(thumblist) > 0: 
         thumb = thumblist[0]
     
+    html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
     cloudflare.s3_init(config_json['s3-endpoint-url'], config_json['s3-access-key-id'], config_json['s3-secret-access-key'])
-    cloudflare.s3_upload(changelog_html_path, config_json['s3-bucket-name'], f'changelog/{order_num}.html')
-    s3_upload_file = config_json['s3-url'] + f'/changelog/{order_num}.html'
+    cloudflare.s3_upload(changelog_html_path, config_json['s3-bucket-name'], f'changelog/{html_upload_name}.html')
+    s3_upload_file = config_json['s3-url'] + f'/changelog/{html_upload_name}.html'
 
     discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb, number_show, changelog_show, s3_upload_file)
     
