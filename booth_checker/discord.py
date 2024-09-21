@@ -8,7 +8,8 @@ from shared import changelog_html_path
 
 def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb, number_show, changelog_show, s3_upload_file):
     fields = list()
-    if number_show is not False:
+
+    if number_show:
         fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
         fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
     
@@ -22,12 +23,12 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
     payload = dict()
     payload["content"] = "@here"
     payload["embeds"] = list()
-    payload["fields"] = fields
     payload_embed = dict()
     payload_embed["title"] = name
     payload_embed["color"] = 65280
     payload_embed["author"] = dict([("name", author_name), ("icon_url", author_icon)])
     payload_embed["description"] = "업데이트 발견! "
+    payload_embed["fields"] = fields
     payload_embed["footer"] = dict([("text", "BOOTH.pm"), ("icon_url", "https://booth.pm/static-images/pwa/icon_size_128.png")])
     payload_embed["thumbnail"] = dict([("url", thumb)])
     payload_embed["url"] = url
