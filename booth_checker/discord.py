@@ -4,8 +4,6 @@ from pytz import timezone
 from datetime import datetime
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
-from shared import changelog_html_path
-
 def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb, number_show, changelog_show, s3_upload_file):
     fields = list()
 
