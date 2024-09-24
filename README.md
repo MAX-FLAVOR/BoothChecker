@@ -108,6 +108,6 @@ Discord Webhook에 체인지로그 이미지를 표시할지 설정할 수 있�
 
 https://www.jetbrains.com/lp/mono/
 
-`Google Noto'
+`Google Noto`
 
 https://fonts.google.com/noto
