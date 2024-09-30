@@ -7,6 +7,11 @@ from requests_toolbelt.multipart.encoder import MultipartEncoder
 def webhook(webhook_url, url, name, version_list, download_short_list, author_info, thumb, number_show, changelog_show, s3_upload_file):
     fields = list()
 
+    if version_list:
+        description = "업데이트 발견!"
+    else:
+        description = "새 아이템 등록!"
+
     if number_show:
         fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
         fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
@@ -25,7 +30,7 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
     payload_embed["title"] = name
     payload_embed["color"] = 65280
     payload_embed["author"] = dict([("name", author_name), ("icon_url", author_icon)])
-    payload_embed["description"] = "업데이트 발견! "
+    payload_embed["description"] = description
     payload_embed["fields"] = fields
     payload_embed["footer"] = dict([("text", "BOOTH.pm"), ("icon_url", "https://booth.pm/static-images/pwa/icon_size_128.png")])
     payload_embed["thumbnail"] = dict([("url", thumb)])
@@ -35,8 +40,8 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
 
     fields = dict()
     
-    if changelog_show is not False:
-        payload_embed["description"] = f'# 업데이트 발견! \n ## [변경사항 보기]({s3_upload_file})'
+    if changelog_show:
+        payload_embed["description"] = f'# {description} \n ## [변경사항 보기]({s3_upload_file})'
 
     # This convert dict to string with keep double quote like: "content": "@here"
     payload_str = simdjson.dumps(payload)
