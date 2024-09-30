@@ -13,7 +13,8 @@ def webhook(webhook_url, url, name, version_list, download_short_list, author_in
         description = "새 아이템 등록!"
 
     if number_show:
-        fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
+        if version_list:
+            fields.append({"name": "LOCAL", "value": str(version_list), "inline": True})
         fields.append({"name": "BOOTH", "value": str(download_short_list), "inline": True})
     
     if author_info is not None:
