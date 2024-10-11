@@ -100,7 +100,9 @@ def init_update_check(product):
             os.makedirs(archive_folder, exist_ok=True)
             archive_path = archive_folder + '/' + item[1]
             shutil.copyfile(download_path, archive_path)
-        
+
+    changelog_html_path = 'changelog_temp.html'
+
     if changelog_show is True:
         log_print(order_num, f'parsing {item[0]} structure')
         init_file_process(download_path, item[1], version_json, encoding)
@@ -241,7 +243,6 @@ def init_update_check(product):
             </html>
             """
 
-            # HTML 파일로 저장
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(html_content)
 

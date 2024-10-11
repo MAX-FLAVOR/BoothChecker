@@ -1,8 +1,6 @@
 import os.path
 import simdjson
 
-changelog_html_path = 'changelog_temp.html'
-
 def createVersionFile(version_file_path):
     f = open(version_file_path, 'w')
     
