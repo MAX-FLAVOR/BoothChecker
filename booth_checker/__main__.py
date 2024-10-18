@@ -491,7 +491,6 @@ if __name__ == "__main__":
         refresh_interval = config_json['refresh-interval']
             
         # 계정
-        booth_cookie = {"_plaza_session_nktz7u": config_json['session-cookie']}
         discord_webhook_url = config_json['discord-webhook-url']
 
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
@@ -504,6 +503,7 @@ if __name__ == "__main__":
         current_time = strftime_now()
 
         for product in config_json['products']:
+            booth_cookie = {"_plaza_session_nktz7u": product['session-cookie']}
             order_num = product['booth-order-number']
             # BOOTH Heartbeat
             # KT™ Sucks. Thank you.
