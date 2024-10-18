@@ -5,8 +5,6 @@ import requests
 import uuid
 
 from time import sleep
-from datetime import datetime
-from PIL import Image, ImageDraw
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
 
@@ -16,6 +14,7 @@ import booth
 import discord
 import re
 import cloudflare
+import booth_sqlite
 
 # mark_as
 #   - 0: Nothing
@@ -28,14 +27,14 @@ import cloudflare
 # download_url_list
 #   - [download_number, filename]
 
-def init_update_check(product):
-    order_num = product['booth-order-number']
-    name = product.get('booth-product-name')
-    check_only_list = product.get('booth-check-only')
-    encoding = product.get('intent-encoding')
-    number_show = product.get('download-number-show')
-    changelog_show = product.get('changelog-show')
-    archive_this = product.get('archive_this', True)
+def init_update_check(item):
+    order_num = item[1]
+    name = item[2]
+    check_only_list = item[3]
+    encoding = item[4]
+    number_show = item[5]
+    changelog_show = item[6]
+    archive_this = item[7]
             
     download_short_list = list()
     thumblist = list()
@@ -47,9 +46,7 @@ def init_update_check(product):
 
     download_url_list = download_url_list[0]
 
-    version_filename = product.get('custom-version-filename')
-    if version_filename is None:
-        version_filename = order_num
+    version_filename = order_num
     
     version_file_path = f'./version/{version_filename}.json'
 
@@ -257,9 +254,9 @@ def init_update_check(product):
         thumb = thumblist[0]
     
     html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
-    cloudflare.s3_init(config_json['s3-endpoint-url'], config_json['s3-access-key-id'], config_json['s3-secret-access-key'])
-    cloudflare.s3_upload(changelog_html_path, config_json['s3-bucket-name'], f'changelog/{html_upload_name}.html')
-    s3_upload_file = config_json['s3-url'] + f'/changelog/{html_upload_name}.html'
+    cloudflare.s3_init(os.getenv('s3_endpoint_url'), os.getenv('s3_access_key_id'), os.getenv('s3_secret_access_key'))
+    cloudflare.s3_upload(changelog_html_path, os.getenv('s3_bucket_name'), f'changelog/{html_upload_name}.html')
+    s3_upload_file = os.getenv('s3_url') + f'/changelog/{html_upload_name}.html'
 
     discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb, number_show, changelog_show, s3_upload_file)
     
@@ -482,17 +479,12 @@ if __name__ == "__main__":
     createFolder("./download")
     createFolder("./process")
 
+    refresh_interval = int(os.getenv('refresh_interval'))
+        
     while True:
-        config_json = {}
-        with open("checklist.json") as file:
-            config_json = simdjson.load(file)
-
-        # 갱신 간격 (초)
-        refresh_interval = config_json['refresh-interval']
-            
-        # 계정
-        discord_webhook_url = config_json['discord-webhook-url']
-
+        booth_orders = booth_sqlite.BoothSQLite('./version/booth.db')
+        booth_items = booth_orders.get_items()
+        
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")
@@ -501,10 +493,10 @@ if __name__ == "__main__":
         createFolder("./process")
         
         current_time = strftime_now()
-
-        for product in config_json['products']:
-            booth_cookie = {"_plaza_session_nktz7u": product['session-cookie']}
-            order_num = product['booth-order-number']
+        
+        for item in booth_items:
+            booth_cookie = {"_plaza_session_nktz7u": item[0]}
+            order_num = item[1]
             # BOOTH Heartbeat
             # KT™ Sucks. Thank you.
             
@@ -516,7 +508,7 @@ if __name__ == "__main__":
                 break
         
             try:
-                init_update_check(product)
+                init_update_check(item)
             except PermissionError:
                 log_print(order_num, 'error occured on checking')
             

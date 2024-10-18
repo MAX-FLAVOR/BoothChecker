@@ -3,6 +3,5 @@ requests-toolbelt
 beautifulsoup4
 pysimdjson
 unitypackage_extractor
-Pillow
 pytz
 boto3
