@@ -16,9 +16,6 @@ import re
 import cloudflare
 import booth_sqlite
 
-import dotenv 
-dotenv.load_dotenv()
-
 # mark_as
 #   - 0: Nothing
 #   - 1: Added
@@ -255,7 +252,7 @@ def init_update_check(item, booth_discord_bot):
         html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
         cloudflare.s3_init(os.getenv('s3_endpoint_url'), os.getenv('s3_access_key_id'), os.getenv('s3_secret_access_key'))
         cloudflare.s3_upload(changelog_html_path, os.getenv('s3_bucket_name'), f'changelog/{html_upload_name}.html')
-        s3_upload_file = os.getenv('s3_url') + f'/changelog/{html_upload_name}.html'
+        s3_upload_file = os.getenv('s3_bucket_url') + f'/changelog/{html_upload_name}.html'
 
     # discord author info
     author_info = booth.crawling_product(url)
