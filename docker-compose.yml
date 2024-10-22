@@ -1,9 +1,8 @@
 services:
-  booth-update-checker:
-    image: ogunarmaya/booth-update-checker:latest
-    container_name: booth-update-checker
+  app:
+    build: .
+    env_file:
+      - .env
     volumes:
-      - ./checklist.json:/root/booth-update-checker/checklist.json
       - ./version:/root/booth-update-checker/version
       - ./archive:/root/booth-update-checker/archive
-    restart: unless-stopped

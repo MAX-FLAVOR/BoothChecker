@@ -3,7 +3,7 @@ import zipfile
 import hashlib
 import requests
 import uuid
-
+import asyncio
 from time import sleep
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
@@ -11,10 +11,13 @@ from unitypackage_extractor.extractor import extractPackage
 from log import *
 from shared import *
 import booth
-import discord
+import booth_discord
 import re
 import cloudflare
 import booth_sqlite
+
+import dotenv 
+dotenv.load_dotenv()
 
 # mark_as
 #   - 0: Nothing
@@ -27,18 +30,24 @@ import booth_sqlite
 # download_url_list
 #   - [download_number, filename]
 
-def init_update_check(item):
-    order_num = item[1]
-    name = item[2]
-    check_only_list = item[3]
-    encoding = item[4]
-    number_show = item[5]
-    changelog_show = item[6]
-    archive_this = item[7]
-            
+def init_update_check(item, booth_discord_bot):
+    order_num = item[0]
+    name = item[1]
+    check_only_list = item[2]
+    encoding = item[3]
+    number_show = bool(item[4])
+    changelog_show = bool(item[5])
+    archive_this = bool(item[6])
+    booth_cookie = {"_plaza_session_nktz7u": item[7]}
+    discord_user_id = item[8]
+    discord_channel_id = item[9]
+
     download_short_list = list()
     thumblist = list()
     download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
+
+    if download_url_list is None:
+        booth_discord_bot.send_error_message(discord_channel_id, discord_user_id)
 
     if name is None:
         name = download_url_list[1][0][0]
@@ -93,7 +102,7 @@ def init_update_check(item):
         
         # archive stuff
         if archive_this and item[0] not in local_list:
-            archive_folder = f'./archive/{current_time}'
+            archive_folder = f'./archive/{strftime_now()}'
             os.makedirs(archive_folder, exist_ok=True)
             archive_path = archive_folder + '/' + item[1]
             shutil.copyfile(download_path, archive_path)
@@ -116,7 +125,7 @@ def init_update_check(item):
 
         # path_list가 비어 있으면 경고 출력
         if not path_list:
-            print("Warning: path_list is empty. Changelog will not be generated.")
+            log_print("Warning: path_list is empty. Changelog will not be generated.")
         else:
             # path_list로부터 트리 구조 생성
             def build_tree(paths):
@@ -243,8 +252,12 @@ def init_update_check(item):
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(html_content)
 
+        html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
+        cloudflare.s3_init(os.getenv('s3_endpoint_url'), os.getenv('s3_access_key_id'), os.getenv('s3_secret_access_key'))
+        cloudflare.s3_upload(changelog_html_path, os.getenv('s3_bucket_name'), f'changelog/{html_upload_name}.html')
+        s3_upload_file = os.getenv('s3_url') + f'/changelog/{html_upload_name}.html'
 
-    # add webhook
+    # discord author info
     author_info = booth.crawling_product(url)
     
     # FIXME: This was not supposed to exist.
@@ -252,13 +265,13 @@ def init_update_check(item):
     thumb = "https://asset.booth.pm/assets/thumbnail_placeholder_f_150x150-73e650fbec3b150090cbda36377f1a3402c01e36ff9fa96158de6016fa067d01.png"
     if length_hint(thumblist) > 0: 
         thumb = thumblist[0]
-    
-    html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
-    cloudflare.s3_init(os.getenv('s3_endpoint_url'), os.getenv('s3_access_key_id'), os.getenv('s3_secret_access_key'))
-    cloudflare.s3_upload(changelog_html_path, os.getenv('s3_bucket_name'), f'changelog/{html_upload_name}.html')
-    s3_upload_file = os.getenv('s3_url') + f'/changelog/{html_upload_name}.html'
 
-    discord.webhook(discord_webhook_url, url, name, local_list, download_short_list, author_info, thumb, number_show, changelog_show, s3_upload_file)
+    def discord_sync():
+        loop = asyncio.get_event_loop()
+        loop.create_task(booth_discord_bot.send_message(
+            name, url, thumb, local_list, download_short_list, author_info, 
+            number_show, changelog_show, s3_upload_file, discord_channel_id))
+    discord_sync()
     
     if changelog_show is True:
         os.remove(changelog_html_path)
@@ -469,21 +482,11 @@ def remove_element_mark(previous, root, root_name):
 
 def process_delete_keys(previous, root_name):
     del previous[root_name]
-        
 
-if __name__ == "__main__":
-    global booth_cookie, discord_webhook_url
-    
-    createFolder("./version")
-    createFolder("./archive")
-    createFolder("./download")
-    createFolder("./process")
-
-    refresh_interval = int(os.getenv('refresh_interval'))
-        
+async def booth_loop(booth_db, booth_discord_bot, refresh_interval):
     while True:
-        booth_orders = booth_sqlite.BoothSQLite('./version/booth.db')
-        booth_items = booth_orders.get_items()
+        log_print("Checking BOOTH")
+        booth_items = booth_db.get_booth_items()
         
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
@@ -492,10 +495,7 @@ if __name__ == "__main__":
         createFolder("./download")
         createFolder("./process")
         
-        current_time = strftime_now()
-        
         for item in booth_items:
-            booth_cookie = {"_plaza_session_nktz7u": item[0]}
             order_num = item[1]
             # BOOTH Heartbeat
             # KT™ Sucks. Thank you.
@@ -508,10 +508,34 @@ if __name__ == "__main__":
                 break
         
             try:
-                init_update_check(item)
+                init_update_check(item, booth_discord_bot)
             except PermissionError:
                 log_print(order_num, 'error occured on checking')
             
         # 갱신 대기
         print("waiting for refresh")
-        sleep(refresh_interval)
+        await asyncio.sleep(refresh_interval)
+
+async def run_bot(booth_discord_bot):
+    # 봇 실행을 별도 비동기 작업으로 실행
+    await booth_discord_bot.bot.start(os.environ['discord_bot_token'])
+
+async def main():
+    createFolder("./version")
+    createFolder("./archive")
+    createFolder("./download")
+    createFolder("./process")
+
+    booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
+
+    booth_discord_bot = booth_discord.DiscordBot(booth_db)
+    bot_task = asyncio.create_task(run_bot(booth_discord_bot))
+
+    await asyncio.sleep(10)
+
+    await booth_loop(booth_db, booth_discord_bot, int(os.getenv('refresh_interval')))
+
+    await bot_task
+
+if __name__ == "__main__":
+    asyncio.run(main())
