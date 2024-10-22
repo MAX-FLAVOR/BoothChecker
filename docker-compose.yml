@@ -6,3 +6,4 @@ services:
     volumes:
       - ./version:/root/booth-update-checker/version
       - ./archive:/root/booth-update-checker/archive
+    restart: unless-stopped

@@ -5,3 +5,4 @@ pysimdjson
 unitypackage_extractor
 pytz
 boto3
+discord.py

@@ -12,9 +12,9 @@ from log import *
 from shared import *
 import booth
 import booth_discord
+import booth_sqlite
 import re
 import cloudflare
-import booth_sqlite
 
 # mark_as
 #   - 0: Nothing
@@ -482,7 +482,6 @@ def process_delete_keys(previous, root_name):
 
 async def booth_loop(booth_db, booth_discord_bot, refresh_interval):
     while True:
-        log_print("Checking BOOTH")
         booth_items = booth_db.get_booth_items()
         
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
