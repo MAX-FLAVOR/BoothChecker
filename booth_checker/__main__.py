@@ -30,7 +30,10 @@ import cloudflare
 def init_update_check(item, booth_discord_bot):
     order_num = item[0]
     name = item[1]
-    check_only_list = item[2]
+    if item[2] is not None:
+        check_only_list = item[2].split(',')
+    else:
+        check_only_list = None
     encoding = item[3]
     number_show = bool(item[4])
     changelog_show = bool(item[5])
@@ -492,7 +495,7 @@ async def booth_loop(booth_db, booth_discord_bot, refresh_interval):
         createFolder("./process")
         
         for item in booth_items:
-            order_num = item[1]
+            order_num = item[0]
             # BOOTH Heartbeat
             # KT™ Sucks. Thank you.
             
@@ -517,11 +520,6 @@ async def run_bot(booth_discord_bot):
     await booth_discord_bot.bot.start(os.environ['discord_bot_token'])
 
 async def main():
-    createFolder("./version")
-    createFolder("./archive")
-    createFolder("./download")
-    createFolder("./process")
-
     booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
 
     booth_discord_bot = booth_discord.DiscordBot(booth_db)
@@ -534,4 +532,9 @@ async def main():
     await bot_task
 
 if __name__ == "__main__":
+    createFolder("./version")
+    createFolder("./archive")
+    createFolder("./download")
+    createFolder("./process")
+
     asyncio.run(main())
