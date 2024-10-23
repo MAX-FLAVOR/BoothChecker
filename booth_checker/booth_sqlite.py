@@ -66,19 +66,21 @@ class BoothSQLite():
         self.conn.commit()
         return self.cursor.lastrowid
     
-    def add_booth_item(self, discord_user_id, booth_order_number, booth_item_name, booth_check_only, intent_encoding, download_number_show, changelog_show, archive_this):
+    def add_booth_item(self, discord_user_id, booth_order_number, booth_item_name, booth_check_only, intent_encoding):
         booth_account = self.get_booth_account(discord_user_id)
+        # 서버에 부스 아이템 파일이 남지않도록 하드코딩
+        # download_number_show False, changelog_show True, archive_this False
         if booth_account:
             self.cursor.execute('''
-                INSERT INTO booth_items (booth_order_number, booth_item_name, booth_check_only, intent_encoding, download_number_show, changelog_show, archive_this, discord_user_id)
+                INSERT OR REPLACE INTO booth_items (booth_order_number, booth_item_name, booth_check_only, intent_encoding, download_number_show, changelog_show, archive_this, discord_user_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (booth_order_number,
                   booth_item_name,
                   booth_check_only,
                   intent_encoding,
-                  int(download_number_show),
-                  int(changelog_show),
-                  int(archive_this),
+                  False,
+                  True,
+                  False,
                   discord_user_id))
             self.conn.commit()
             return self.cursor.lastrowid
