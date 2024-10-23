@@ -29,27 +29,25 @@ class DiscordBot:
 
         @self.bot.tree.command(name="booth_add_item", description="BOOTH 아이템 등록")
         @app_commands.describe(order_number="BOOTH 주문 번호를 입력 해주세요")
+        @app_commands.describe(item_name="아이템 이름을 입력 해주세요")
+        @app_commands.describe(check_only="확인하고 싶은 아이템의 상품페이지 번호를 입력해주세요 (ex. 1234567,2345678)")
+        @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요")
         async def set_item(
             interaction: discord.Interaction, 
             order_number: str, 
             item_name: str = None, 
             check_only: str = None, 
-            intent_encoding: str = "shift_jis", 
-            download_number_show: bool = False, 
-            changelog_show: bool = True, 
-            archive_this: bool = False
+            intent_encoding: str = "shift_jis"
         ):
             try:
-                logger.info(f"User {interaction.user.id} is adding item with order number {order_number}")
                 self.booth_db.add_booth_item(
                     interaction.user.id, 
                     order_number, 
                     item_name, 
                     check_only, 
                     intent_encoding, 
-                    download_number_show, 
-                    changelog_show, 
-                    archive_this)
+                    )
+                logger.info(f"User {interaction.user.id} is adding item with order number {order_number}")
                 await interaction.response.send_message("BOOTH 아이템 등록 완료", ephemeral=True)
             except Exception as e:
                 logger.error(f"Error occurred while adding BOOTH item: {e}")
