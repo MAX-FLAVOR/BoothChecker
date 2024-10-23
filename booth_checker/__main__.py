@@ -92,6 +92,85 @@ def init_update_check(item, booth_discord_bot):
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
     
+    def build_tree(paths):
+        tree = {}
+        path_stack = []
+        for item in paths:
+            line_str = item.get('line_str', '')
+            status = item.get('status', 0)
+
+            # 후행 공백만 제거하여 선행 공백을 보존
+            line_str = line_str.rstrip()
+
+            # 선행 공백의 수를 계산하여 들여쓰기 수준 결정
+            indent_match = re.match(r'^(\s*)(.*)', line_str)
+            if indent_match:
+                leading_spaces = indent_match.group(1)
+                indent = len(leading_spaces)
+                content = indent_match.group(2)
+            else:
+                indent = 0
+                content = line_str
+
+            # content에서 상태 문자열 제거
+            content = re.sub(r'\s*\(.*\)$', '', content)
+
+            # 깊이 계산 (들여쓰기 수준에 따라)
+            depth = indent // 4  # 공백 4칸당 한 레벨로 설정 (필요에 따라 조정)
+
+            # 현재 깊이에 맞게 경로 스택 조정
+            path_stack = path_stack[:depth]
+            path_stack.append(content)
+
+            # 트리 빌드
+            node = tree
+            for part in path_stack[:-1]:
+                node = node.setdefault(part, {})
+            # 현재 노드에 상태 정보 저장
+            current_node = node.setdefault(path_stack[-1], {})
+            current_node['_status'] = status
+        return tree
+
+    def tree_to_html(tree):
+        html = '<ul>'
+        for key, subtree in tree.items():
+            if key == '_status':
+                continue  # 상태 정보는 별도로 처리
+            status = subtree.get('_status', 0)
+
+            # 상태에 따른 컬러 지정
+            line_color = 'rgb(255, 255, 255)'  # 기본 색상 (흰색)
+            if status == 1:
+                line_color = 'rgb(125, 164, 68)'  # Added (녹색 계열)
+            elif status == 2:
+                line_color = 'rgb(252, 101, 89)'  # Deleted (빨간색 계열)
+            elif status == 3:
+                line_color = 'rgb(128, 161, 209)'  # Changed (파란색 계열)
+
+            # 상태 문자열 추가
+            status_str = ''
+            if status == 1:
+                status_str = ' (Added)'
+            elif status == 2:
+                status_str = ' (Deleted)'
+            elif status == 3:
+                status_str = ' (Changed)'
+
+            # '_status' 키를 제외한 나머지로 재귀 호출
+            child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
+
+            if child_subtree:
+                # 자식이 있는 경우
+                html += f'<li><span style="color:{line_color}">{key}{status_str}</span>'
+                html += tree_to_html(child_subtree)
+                html += '</li>'
+            else:
+                # 자식이 없는 경우
+                html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>'
+        html += '</ul>'
+        return html
+
+    # 먼저 다운로드 및 아카이브 처리
     for item in download_url_list: 
         # download stuff
         download_path = f'./download/{item[1]}'
@@ -107,147 +186,76 @@ def init_update_check(item, booth_discord_bot):
             archive_path = archive_folder + '/' + item[1]
             shutil.copyfile(download_path, archive_path)
 
-    changelog_html_path = 'changelog_temp.html'
-
+    # 다운로드 및 아카이브 처리가 끝난 후에 changelog 생성
     if changelog_show is True:
-        log_print(order_num, f'parsing {item[0]} structure')
-        init_file_process(download_path, item[1], version_json, encoding)
-
-        # 필요한 전역 변수 선언
         global path_list, current_level, current_count, highest_level
 
-        # 초기화
-        path_list = []
-        current_level = 0
-        current_count = 0
-        highest_level = 0
-        init_pathinfo(version_json)
+        html_list_items = ""
+        tree = ""
 
-        # path_list가 비어 있으면 경고 출력
+        for booth_item in download_url_list:  # 각 파일에 대해 처리
+            download_path = f'./download/{booth_item[1]}'
+            log_print(order_num, f'parsing {booth_item[0]} structure')
+            init_file_process(download_path, booth_item[1], version_json, encoding)
+
+            # 초기화
+            path_list = []
+            current_level = 0
+            current_count = 0
+            highest_level = 0
+            init_pathinfo(version_json)
+
         if not path_list:
-            log_print("Warning: path_list is empty. Changelog will not be generated.")
+            log_print(order_num, f'Warning: path_list for {booth_item[0]} is empty. Changelog will not be generated.')
         else:
-            # path_list로부터 트리 구조 생성
-            def build_tree(paths):
-                tree = {}
-                path_stack = []
-                for item in paths:
-                    line_str = item.get('line_str', '')
-                    status = item.get('status', 0)
-                    
-                    # 후행 공백만 제거하여 선행 공백을 보존
-                    line_str = line_str.rstrip()
-                    
-                    # 선행 공백의 수를 계산하여 들여쓰기 수준 결정
-                    indent_match = re.match(r'^(\s*)(.*)', line_str)
-                    if indent_match:
-                        leading_spaces = indent_match.group(1)
-                        indent = len(leading_spaces)
-                        content = indent_match.group(2)
-                    else:
-                        indent = 0
-                        content = line_str
-                    
-                    # content에서 상태 문자열 제거
-                    content = re.sub(r'\s*\(.*\)$', '', content)
-                    
-                    # 깊이 계산 (들여쓰기 수준에 따라)
-                    depth = indent // 4  # 공백 4칸당 한 레벨로 설정 (필요에 따라 조정)
-                    
-                    # 현재 깊이에 맞게 경로 스택 조정
-                    path_stack = path_stack[:depth]
-                    path_stack.append(content)
-                    
-                    # 트리 빌드
-                    node = tree
-                    for part in path_stack[:-1]:
-                        node = node.setdefault(part, {})
-                    # 현재 노드에 상태 정보 저장
-                    current_node = node.setdefault(path_stack[-1], {})
-                    current_node['_status'] = status
-                return tree
-
-            # 트리 구조를 HTML로 변환하며 상태에 따른 텍스트 색상 지정
-            def tree_to_html(tree):
-                html = '<ul>'
-                for key, subtree in tree.items():
-                    if key == '_status':
-                        continue  # 상태 정보는 별도로 처리
-                    status = subtree.get('_status', 0)
-
-                    # 상태에 따른 컬러 지정
-                    line_color = 'rgb(255, 255, 255)'  # 기본 색상 (흰색)
-                    if status == 1:
-                        line_color = 'rgb(125, 164, 68)'  # Added (녹색 계열)
-                    elif status == 2:
-                        line_color = 'rgb(252, 101, 89)'  # Deleted (빨간색 계열)
-                    elif status == 3:
-                        line_color = 'rgb(128, 161, 209)'  # Changed (파란색 계열)
-
-                    # 상태 문자열 추가
-                    status_str = ''
-                    if status == 1:
-                        status_str = ' (Added)'
-                    elif status == 2:
-                        status_str = ' (Deleted)'
-                    elif status == 3:
-                        status_str = ' (Changed)'
-
-                    # '_status' 키를 제외한 나머지로 재귀 호출
-                    child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
-
-                    if child_subtree:
-                        # 자식이 있는 경우
-                        html += f'<li><span style="color:{line_color}">{key}{status_str}</span>'
-                        html += tree_to_html(child_subtree)
-                        html += '</li>'
-                    else:
-                        # 자식이 없는 경우
-                        html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>'
-                html += '</ul>'
-                return html
-
             tree = build_tree(path_list)
-            html_list_items = tree_to_html(tree)
+            html_list_items = tree_to_html(tree)  # 각 파일의 트리 구조를 추가
 
-            # HTML 문서 생성
-            html_content = f"""
-            <!DOCTYPE html>
-            <html lang="ko">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Changelog</title>
-                <style>
-                    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Noto+Sans+JP&family=Noto+Sans+KR&display=swap');
-                    body {{
-                        font-family: "JetBrains Mono", monospace, "Noto Sans JP", sans-serif, "Noto Sans KR", sans-serif;
-                        font-weight: 400;
-                        font-style: normal;
-                        font-size: 16px;
-                        line-height: 1.6;
-                        background-color: #1e1e1e;
-                        color: #ffffff;
-                    }}
-                    h1 {{
-                        font-size: 24px;
-                        font-weight: 700;
-                    }}
-                    ul {{
-                        list-style-type: disc;
-                        padding-left: 20px;
-                    }}
-                    li {{
-                        margin-bottom: 5px;
-                    }}
-                </style>
-            </head>
-            <body>
-                <h1>Changelog</h1>
-                {html_list_items}
-            </body>
-            </html>
-            """
+        # HTML 문서 생성
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Changelog</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Noto+Sans+JP&family=Noto+Sans+KR&display=swap');
+                body {{
+                    font-family: "JetBrains Mono", monospace, "Noto Sans JP", sans-serif, "Noto Sans KR", sans-serif;
+                    font-weight: 400;
+                    font-style: normal;
+                    font-size: 16px;
+                    line-height: 1.6;
+                    background-color: #1e1e1e;
+                    color: #ffffff;
+                }}
+                h1 {{
+                    font-size: 24px;
+                    font-weight: 700;
+                }}
+                h2 {{
+                    font-size: 20px;
+                    margin-top: 20px;
+                    font-weight: 600;
+                }}
+                ul {{
+                    list-style-type: disc;
+                    padding-left: 20px;
+                }}
+                li {{
+                    margin-bottom: 5px;
+                }}
+            </style>
+        </head>
+        <body>
+            <h1>Changelog</h1>
+            {html_list_items}  <!-- 각 파일의 목록이 추가됨 -->
+        </body>
+        </html>
+        """
+
+        changelog_html_path = "changelog_temp.html"
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(html_content)
