@@ -2,18 +2,19 @@ import shutil
 import zipfile
 import hashlib
 import requests
+import re
 import uuid
 import asyncio
-from time import sleep
+import logging
+from datetime import datetime
+
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
 
-from log import *
 from shared import *
 import booth
 import booth_discord
 import booth_sqlite
-import re
 import cloudflare
 
 # mark_as
@@ -60,15 +61,15 @@ def init_update_check(item, booth_discord_bot):
     version_file_path = f'./version/{version_filename}.json'
 
     if not os.path.exists(version_file_path):
-        log_print(order_num, 'version file not found')
+        logger.info(f'[{order_num}] version file not found')
         createVersionFile(version_file_path)
-        log_print(order_num, 'version file created')
+        logger.info(f'[{order_num}] version file created')
     
     file = open(version_file_path, 'r+')
     try:
         version_json = simdjson.load(file)
     except:
-        log_print(order_num, 'version file corrupted')
+        logger.warning(f'[{order_num}] version file corrupted')
         createVersionFile(version_file_path)
         version_json = simdjson.load(file)
     
@@ -80,10 +81,10 @@ def init_update_check(item, booth_discord_bot):
         return
              
     if (length_hint(download_short_list) == 0):
-        log_print(order_num, 'BOOTH no responding')
+        logger.error(f'[{order_num}] BOOTH no responding')
         return
     else:
-        log_print(order_num, 'something has changed')
+        logger.info(f'[{order_num}] something has changed')
     
     global saved_prehash
     saved_prehash = {}
@@ -170,18 +171,19 @@ def init_update_check(item, booth_discord_bot):
         html += '</ul>'
         return html
 
+    archive_folder = f'./archive/{strftime_now()}'
+
     # 먼저 다운로드 및 아카이브 처리
     for item in download_url_list: 
         # download stuff
         download_path = f'./download/{item[1]}'
         
         if changelog_show is True or archive_this is True:
-            log_print(order_num, f'downloading {item[0]} to {download_path}')
+            logger.info(f'[{order_num}] downloading {item[0]} to {download_path}')
             booth.download_item(item[0], download_path, booth_cookie)
         
         # archive stuff
         if archive_this and item[0] not in local_list:
-            archive_folder = f'./archive/{strftime_now()}'
             os.makedirs(archive_folder, exist_ok=True)
             archive_path = archive_folder + '/' + item[1]
             shutil.copyfile(download_path, archive_path)
@@ -195,7 +197,7 @@ def init_update_check(item, booth_discord_bot):
 
         for booth_item in download_url_list:  # 각 파일에 대해 처리
             download_path = f'./download/{booth_item[1]}'
-            log_print(order_num, f'parsing {booth_item[0]} structure')
+            logger.info(f'[{order_num}] parsing {booth_item[0]} structure')
             init_file_process(download_path, booth_item[1], version_json, encoding)
 
             # 초기화
@@ -206,7 +208,7 @@ def init_update_check(item, booth_discord_bot):
             init_pathinfo(version_json)
 
         if not path_list:
-            log_print(order_num, f'Warning: path_list for {booth_item[0]} is empty. Changelog will not be generated.')
+            logger.warning(f'[{order_num}] path_list for {booth_item[0]} is empty. Changelog will not be generated.')
         else:
             tree = build_tree(path_list)
             html_list_items = tree_to_html(tree)  # 각 파일의 트리 구조를 추가
@@ -508,19 +510,19 @@ async def booth_loop(booth_db, booth_discord_bot, refresh_interval):
             # KT™ Sucks. Thank you.
             
             try:
-                log_print(order_num, 'Checking BOOTH heartbeat')
+                logger.info(f'[{order_num}] Checking BOOTH heartbeat')
                 requests.get("https://booth.pm")
             except:
-                log_print(order_num, 'BOOTH heartbeat failed')
+                logger.error(f'[{order_num}] BOOTH heartbeat failed')
                 break
         
             try:
                 init_update_check(item, booth_discord_bot)
             except PermissionError:
-                log_print(order_num, 'error occured on checking')
+                logger.error(f'[{order_num}] error occured on checking')
             
         # 갱신 대기
-        print("waiting for refresh")
+        logger.info("waiting for refresh")
         await asyncio.sleep(refresh_interval)
 
 async def run_bot(booth_discord_bot):
@@ -530,7 +532,7 @@ async def run_bot(booth_discord_bot):
 async def main():
     booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
 
-    booth_discord_bot = booth_discord.DiscordBot(booth_db)
+    booth_discord_bot = booth_discord.DiscordBot(booth_db, logger)
     bot_task = asyncio.create_task(run_bot(booth_discord_bot))
 
     await asyncio.sleep(10)
@@ -540,6 +542,18 @@ async def main():
     await bot_task
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+    current_time = ''
+    def strftime_now():
+        global current_time
+        current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
+        return current_time
+
     createFolder("./version")
     createFolder("./archive")
     createFolder("./download")

@@ -5,17 +5,15 @@ from datetime import datetime
 from pytz import timezone
 import logging
 
-logging.basicConfig(level=logging.INFO)  # 필요시 DEBUG로 변경
-logger = logging.getLogger(__name__)
-
 class DiscordBot:
-    def __init__(self, booth_db):
+    def __init__(self, booth_db, logger):
         intents = discord.Intents.default()
         intents.message_content = True
         self.bot = commands.Bot(command_prefix="/", intents=intents)
         self.setup_commands()
         self.bot.event(self.on_ready)
         self.booth_db = booth_db
+        self.logger = logger
 
     def setup_commands(self):            
         @self.bot.tree.command(name="booth_register", description="BOOTH 계정 등록")
@@ -47,10 +45,10 @@ class DiscordBot:
                     check_only, 
                     intent_encoding, 
                     )
-                logger.info(f"User {interaction.user.id} is adding item with order number {order_number}")
+                self.logger.info(f"User {interaction.user.id} is adding item with order number {order_number}")
                 await interaction.response.send_message("BOOTH 아이템 등록 완료", ephemeral=True)
             except Exception as e:
-                logger.error(f"Error occurred while adding BOOTH item: {e}")
+                self.logger.error(f"Error occurred while adding BOOTH item: {e}")
                 await interaction.response.send_message(f"BOOTH 아이템 등록 실패: {e}", ephemeral=True)
 
     async def send_message(self, name, url, thumb, local_version_list, download_short_list, author_info, number_show, changelog_show, s3_upload_file, channel_id):
@@ -88,9 +86,9 @@ class DiscordBot:
 
     async def on_ready(self):
         await self.bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="BOOTH.pm"))
+        self.logger.info(f'Logged in as {self.bot.user}')
         try:
             synced = await self.bot.tree.sync()
-            logger.info(f'Synced {len(synced)} command(s)')
+            self.logger.info(f'Synced {len(synced)} command(s)')
         except Exception as e:
-            logger.error(f'Error syncing commands: {e}')
-        logger.info(f'Logged in as {self.bot.user}')
+            self.logger.error(f'Error syncing commands: {e}')
