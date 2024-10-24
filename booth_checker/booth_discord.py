@@ -30,7 +30,7 @@ class DiscordBot:
         @app_commands.describe(item_name="아이템 이름을 입력 해주세요")
         @app_commands.describe(check_only="확인하고 싶은 아이템의 상품페이지 번호를 입력해주세요 (ex. 1234567,2345678)")
         @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요")
-        async def set_item(
+        async def booth_add_item(
             interaction: discord.Interaction, 
             order_number: str, 
             item_name: str = None, 
@@ -50,6 +50,37 @@ class DiscordBot:
             except Exception as e:
                 self.logger.error(f"Error occurred while adding BOOTH item: {e}")
                 await interaction.response.send_message(f"BOOTH 아이템 등록 실패: {e}", ephemeral=True)
+
+        @self.bot.tree.command(name="booth_remove_account", description="BOOTH 계정 삭제")
+        async def booth_remove_account(interaction: discord.Interaction):
+            try:
+                self.booth_db.remove_booth_account(interaction.user.id)
+                await interaction.response.send_message("BOOTH 계정 삭제 완료", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"BOOTH 계정 삭제 실패: {e}", ephemeral=True)
+
+        @self.bot.tree.command(name="booth_remove_item", description="BOOTH 아이템 삭제")
+        @app_commands.describe(order_number="BOOTH 주문 번호를 입력 해주세요")
+        async def booth_remove_item(interaction: discord.Interaction, order_number: str):
+            try:
+                self.booth_db.remove_booth_item(interaction.user.id, order_number)
+                await interaction.response.send_message("BOOTH 아이템 삭제 완료", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"BOOTH 아이템 삭제 실패: {e}", ephemeral=True)
+
+        @self.bot.tree.command(name="booth_items_list", description="BOOTH 아이템 목록")
+        async def booth_items_list(interaction: discord.Interaction):
+            try:
+                items = self.booth_db.list_booth_items(interaction.user.id)
+                items_list = []
+                if items:
+                    for i in range(len(items[0])):
+                        items_list.append(items[0][i])
+                    await interaction.response.send_message(f"BOOTH 아이템 목록: {items_list}", ephemeral=True)
+                else:
+                    await interaction.response.send_message("BOOTH 아이템이 없습니다", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"BOOTH 아이템 목록 불러오기 실패: {e}", ephemeral=True)
 
     async def send_message(self, name, url, thumb, local_version_list, download_short_list, author_info, number_show, changelog_show, s3_upload_file, channel_id):
         if local_version_list:

@@ -86,3 +86,37 @@ class BoothSQLite():
             return self.cursor.lastrowid
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
+
+    def remove_booth_account(self, discord_user_id):
+        try:
+            self.cursor.execute('''
+                DELETE FROM booth_accounts WHERE discord_user_id = ?
+            ''', (discord_user_id,))
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except Exception as e:
+            raise Exception(f'BOOTH 계정 삭제 실패: {e}')
+    
+    def remove_booth_item(self, discord_user_id, booth_order_number):
+        booth_account = self.get_booth_account(discord_user_id)
+        if booth_account:
+            try:
+                self.cursor.execute('''
+                    DELETE FROM booth_items WHERE booth_order_number = ? AND discord_user_id = ?
+                ''', (int(booth_order_number), discord_user_id))
+                self.conn.commit()
+                return self.cursor.lastrowid
+            except Exception as e:
+                raise Exception(f'BOOTH 아이템 삭제 실패: {e}')
+        else:
+            raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
+    
+    def list_booth_items(self, discord_user_id):
+        booth_account = self.get_booth_account(discord_user_id)
+        if booth_account:
+            self.cursor.execute('''
+                SELECT booth_order_number FROM booth_items WHERE discord_user_id = ?
+            ''', (discord_user_id,))
+            return self.cursor.fetchall()
+        else:
+            raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
