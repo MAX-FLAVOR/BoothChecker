@@ -72,10 +72,8 @@ class DiscordBot:
         async def booth_items_list(interaction: discord.Interaction):
             try:
                 items = self.booth_db.list_booth_items(interaction.user.id)
-                items_list = []
                 if items:
-                    for i in range(len(items[0])):
-                        items_list.append(items[0][i])
+                    items_list = [row[0] for row in items]
                     await interaction.response.send_message(f"BOOTH 아이템 목록: {items_list}", ephemeral=True)
                 else:
                     await interaction.response.send_message("BOOTH 아이템이 없습니다", ephemeral=True)
