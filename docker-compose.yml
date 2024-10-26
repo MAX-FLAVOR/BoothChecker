@@ -1,9 +1,41 @@
 services:
-  app:
-    build: .
+  booth-checker:
+    build:
+      context: .
+      dockerfile: docker/booth-checker/Dockerfile
     env_file:
       - .env
     volumes:
       - ./version:/root/booth-update-checker/version
       - ./archive:/root/booth-update-checker/archive
+    networks:
+      - booth-network
+    depends_on:
+      - booth-discord
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+      
+  booth-discord:
+    build:
+      context: .
+      dockerfile: docker/booth-discord/Dockerfile
+    env_file:
+      - .env
+    volumes:
+    - ./version:/root/booth-update-checker/version
+    networks:
+      - booth-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  booth-network:
+    driver: bridge

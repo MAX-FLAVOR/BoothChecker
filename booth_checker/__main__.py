@@ -7,13 +7,13 @@ import uuid
 import asyncio
 import logging
 from datetime import datetime
+from time import sleep
 
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
 
 from shared import *
 import booth
-import booth_discord
 import booth_sqlite
 import cloudflare
 
@@ -28,7 +28,7 @@ import cloudflare
 # download_url_list
 #   - [download_number, filename]
 
-def init_update_check(item, booth_discord_bot):
+def init_update_check(item):
     order_num = item[0]
     name = item[1]
     if item[2] is not None:
@@ -48,7 +48,20 @@ def init_update_check(item, booth_discord_bot):
     download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
 
     if download_url_list is None:
-        booth_discord_bot.send_error_message(discord_channel_id, discord_user_id)
+        api_url = 'http://booth-discord:5000/send_error_message'
+
+        data = {
+            'channel_id': discord_channel_id,
+            'usr_id': discord_user_id
+        }
+
+        response = requests.post(api_url, json=data)
+
+        if response.status_code == 200:
+            logger.info('booth_discord API 요청 성공')
+        else:
+            logger.error(f'booth_discord API 요청 실패: {response.text}')
+            return
 
     if name is None:
         name = download_url_list[1][0][0]
@@ -276,12 +289,27 @@ def init_update_check(item, booth_discord_bot):
     if length_hint(thumblist) > 0: 
         thumb = thumblist[0]
 
-    def discord_sync():
-        loop = asyncio.get_event_loop()
-        loop.create_task(booth_discord_bot.send_message(
-            name, url, thumb, local_list, download_short_list, author_info, 
-            number_show, changelog_show, s3_upload_file, discord_channel_id))
-    discord_sync()
+    api_url = 'http://booth-discord:5000/send_message'
+
+    data = {
+        'name': name,
+        'url': url,
+        'thumb': thumb,
+        'local_version_list': local_list,
+        'download_short_list': download_short_list,
+        'author_info': author_info,
+        'number_show': number_show,
+        'changelog_show': changelog_show,
+        's3_upload_file': s3_upload_file,
+        'channel_id': discord_channel_id
+    }
+
+    response = requests.post(api_url, json=data)
+
+    if response.status_code == 200:
+        logger.info('booth_discord API 요청 성공')
+    else:
+        logger.error(f'booth_discord API 요청 실패: {response.text}')
     
     if changelog_show is True:
         os.remove(changelog_html_path)
@@ -493,16 +521,41 @@ def remove_element_mark(previous, root, root_name):
 def process_delete_keys(previous, root_name):
     del previous[root_name]
 
-async def booth_loop(booth_db, booth_discord_bot, refresh_interval):
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+
+    current_time = ''
+    def strftime_now():
+        global current_time
+        current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
+        return current_time
+
+    booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
+
+    createFolder("./version")
+    createFolder("./archive")
+    createFolder("./download")
+    createFolder("./process")
+
+    refresh_interval = int(os.getenv('refresh_interval'))
+
+    sleep(10)
     while True:
         booth_items = booth_db.get_booth_items()
-        
+    
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")
 
         createFolder("./download")
         createFolder("./process")
+        
+        current_time = strftime_now()
         
         for item in booth_items:
             order_num = item[0]
@@ -517,46 +570,10 @@ async def booth_loop(booth_db, booth_discord_bot, refresh_interval):
                 break
         
             try:
-                init_update_check(item, booth_discord_bot)
+                init_update_check(item)
             except PermissionError:
                 logger.error(f'[{order_num}] error occured on checking')
             
         # 갱신 대기
         logger.info("waiting for refresh")
-        await asyncio.sleep(refresh_interval)
-
-async def run_bot(booth_discord_bot):
-    # 봇 실행을 별도 비동기 작업으로 실행
-    await booth_discord_bot.bot.start(os.environ['discord_bot_token'])
-
-async def main():
-    booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
-
-    booth_discord_bot = booth_discord.DiscordBot(booth_db, logger)
-    bot_task = asyncio.create_task(run_bot(booth_discord_bot))
-
-    await asyncio.sleep(10)
-
-    await booth_loop(booth_db, booth_discord_bot, int(os.getenv('refresh_interval')))
-
-    await bot_task
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    logger = logging.getLogger(__name__)
-    current_time = ''
-    def strftime_now():
-        global current_time
-        current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
-        return current_time
-
-    createFolder("./version")
-    createFolder("./archive")
-    createFolder("./download")
-    createFolder("./process")
-
-    asyncio.run(main())
+        sleep(refresh_interval)
