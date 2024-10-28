@@ -41,8 +41,8 @@ class DiscordBot(commands.Bot):
         @self.tree.command(name="booth_add_item", description="BOOTH 아이템 등록")
         @app_commands.describe(order_number="BOOTH 주문 번호를 입력 해주세요")
         @app_commands.describe(item_name="아이템 이름을 입력 해주세요")
-        @app_commands.describe(check_only="확인하고 싶은 아이템의 상품페이지 번호를 입력해주세요 (ex. 1234567,2345678)")
-        @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요")
+        @app_commands.describe(check_only="하나의 주문 번호에 여러 개의 아이템이 있는 경우, 확인하고 싶은 아이템의 상품 페이지 번호를 입력해주세요 (예: 1234567, 2345678)")
+        @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요 (기본값: shift_jis)")
         async def booth_add_item(
             interaction: discord.Interaction,
             order_number: str,
