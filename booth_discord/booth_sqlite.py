@@ -3,6 +3,7 @@ import sqlite3
 class BoothSQLite():
     def __init__(self, db):
         self.conn = sqlite3.connect(db)
+        self.conn.execute("PRAGMA journal_mode=WAL;")
         self.cursor = self.conn.cursor()
 
         self.cursor.execute('''
