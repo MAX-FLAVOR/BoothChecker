@@ -80,7 +80,7 @@ class BoothSQLite():
             self.conn.commit()
             return self.cursor.lastrowid
         except Exception as e:
-            raise Exception(f'BOOTH 계정 삭제 실패: {e}')
+            raise Exception(e)
     
     def remove_booth_item(self, discord_user_id, booth_order_number):
         booth_account = self.get_booth_account(discord_user_id)
@@ -92,7 +92,7 @@ class BoothSQLite():
                 self.conn.commit()
                 return self.cursor.lastrowid
             except Exception as e:
-                raise Exception(f'BOOTH 아이템 삭제 실패: {e}')
+                raise Exception(e)
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
     
