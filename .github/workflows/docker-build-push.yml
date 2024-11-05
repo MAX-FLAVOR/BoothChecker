@@ -21,11 +21,21 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push (booth-checker)
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: ogunarmaya/booth-update-checker:latest
+          file: ./docker/booth-checker/Dockerfile
+          tags: ogunarmaya/booth-checker:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+    
+      - name: Build and push (booth-discord)
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: ./docker/booth-discord/Dockerfile
+          tags: ogunarmaya/booth-discord:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
