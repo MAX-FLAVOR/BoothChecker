@@ -1,13 +1,10 @@
 services:
   booth-checker:
-    build:
-      context: .
-      dockerfile: docker/booth-checker/Dockerfile
-    env_file:
-      - .env
+    image: ogunarmaya/booth-checker:latest
     volumes:
       - ./version:/root/booth-update-checker/version
       - ./archive:/root/booth-update-checker/archive
+      - ./config.json:/root/booth-update-checker/config.json
     networks:
       - booth-network
     depends_on:
@@ -20,13 +17,10 @@ services:
         max-file: "3"
       
   booth-discord:
-    build:
-      context: .
-      dockerfile: docker/booth-discord/Dockerfile
-    env_file:
-      - .env
+    image: ogunarmaya/booth-discord:latest
     volumes:
-    - ./version:/root/booth-update-checker/version
+      - ./version:/root/booth-update-checker/version
+      - ./config.json:/root/booth-update-checker/config.json
     networks:
       - booth-network
     restart: unless-stopped

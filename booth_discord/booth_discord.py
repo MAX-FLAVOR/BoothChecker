@@ -106,8 +106,8 @@ class DiscordBot(commands.Bot):
             author_info = data.get("author_info")
             number_show = data.get("number_show")
             changelog_show = data.get("changelog_show")
-            s3_upload_file = data.get("s3_upload_file")
             channel_id = data.get("channel_id")
+            s3_object_url = data.get("s3_object_url")
 
             await self.send_message(
                 name,
@@ -118,8 +118,8 @@ class DiscordBot(commands.Bot):
                 author_info,
                 number_show,
                 changelog_show,
-                s3_upload_file,
-                channel_id
+                channel_id,
+                s3_object_url
             )
 
             return jsonify({"status": "Message sent"}), 200
@@ -131,15 +131,24 @@ class DiscordBot(commands.Bot):
             user_id = data.get("user_id")
             await self.send_error_message(channel_id, user_id)
             return jsonify({"status": "Error message sent"}), 200
+        
+        @self.app.route("/send_changelog", methods=["POST"])
+        async def send_changelog():
+            data = await request.get_json()
+            channel_id = data.get("channel_id")
+            file = data.get("file")
+            await self.send_changelog(channel_id, file)
+            return jsonify({"status": "Message sent"}), 200
 
-    async def send_message(self, name, url, thumb, local_version_list, download_short_list, author_info, number_show, changelog_show, s3_upload_file, channel_id):
+    async def send_message(self, name, url, thumb, local_version_list, download_short_list, author_info, number_show, changelog_show, channel_id, s3_object_url=None):
         if local_version_list:
-            description = "업데이트 발견!"
+            description = "# 업데이트 발견!"
         else:
-            description = "새 아이템 등록!"
+            description = "# 새 아이템 등록!"
 
         if changelog_show:
-            description = f'# {description} \n ## [변경사항 보기]({s3_upload_file})'
+            if s3_object_url:
+                description = f'{description} \n ## [변경사항 보기]({s3_object_url})'
 
         if author_info is not None:
             author_icon = author_info[0]
@@ -174,6 +183,10 @@ class DiscordBot(commands.Bot):
             colour=discord.Color.red()
         )
         await channel.send(content=f'<@{discord_user_id}>', embed=embed)
+
+    async def send_changelog(self, channel_id, file):
+        channel = self.get_channel(int(channel_id))
+        await channel.send(file=discord.File(file))
 
     async def on_ready(self):
         await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="BOOTH.pm"))

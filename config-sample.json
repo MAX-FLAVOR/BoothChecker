@@ -1,0 +1,13 @@
+{
+    "refresh_interval": 600,
+    "discord_api_url": "http://booth-discord:5000",
+    "discord_bot_token": "",
+    "s3":
+        {
+            "endpoint_url": "",
+            "bucket_name": "",
+            "bucket_access_url": "",
+            "access_key_id": "",
+            "secret_access_key": ""
+        }
+}

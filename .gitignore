@@ -6,7 +6,7 @@ download/
 process/
 version/
 archive/
-checklist.json
+config.json
 
 *.code-workspace
 *.png

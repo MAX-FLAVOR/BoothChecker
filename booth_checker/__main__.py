@@ -1,12 +1,14 @@
 import shutil
 import zipfile
 import hashlib
+import os
 import requests
 import re
 import uuid
 import logging
 from datetime import datetime
 from time import sleep
+from jinja2 import Environment, FileSystemLoader
 
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
@@ -47,7 +49,7 @@ def init_update_check(item):
     download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
 
     if download_url_list is None:
-        api_url = 'http://booth-discord:5000/send_error_message'
+        api_url = f'{discord_api_url}/send_error_message'
 
         data = {
             'channel_id': discord_channel_id,
@@ -145,7 +147,7 @@ def init_update_check(item):
         return tree
 
     def tree_to_html(tree):
-        html = '<ul>'
+        html = '<ul>\n'  # 시작 태그에 줄바꿈 추가
         for key, subtree in tree.items():
             if key == '_status':
                 continue  # 상태 정보는 별도로 처리
@@ -174,13 +176,13 @@ def init_update_check(item):
 
             if child_subtree:
                 # 자식이 있는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span>'
+                html += f'<li><span style="color:{line_color}">{key}{status_str}</span>\n'
                 html += tree_to_html(child_subtree)
-                html += '</li>'
+                html += '</li>\n'
             else:
                 # 자식이 없는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>'
-        html += '</ul>'
+                html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>\n'
+        html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
         return html
 
     archive_folder = f'./archive/{strftime_now()}'
@@ -225,59 +227,26 @@ def init_update_check(item):
             tree = build_tree(path_list)
             html_list_items = tree_to_html(tree)  # 각 파일의 트리 구조를 추가
 
-        # HTML 문서 생성
-        html_content = f"""
-        <!DOCTYPE html>
-        <html lang="ko">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Changelog</title>
-            <style>
-                @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&family=Noto+Sans+JP&family=Noto+Sans+KR&display=swap');
-                body {{
-                    font-family: "JetBrains Mono", monospace, "Noto Sans JP", sans-serif, "Noto Sans KR", sans-serif;
-                    font-weight: 400;
-                    font-style: normal;
-                    font-size: 16px;
-                    line-height: 1.6;
-                    background-color: #1e1e1e;
-                    color: #ffffff;
-                }}
-                h1 {{
-                    font-size: 24px;
-                    font-weight: 700;
-                }}
-                h2 {{
-                    font-size: 20px;
-                    margin-top: 20px;
-                    font-weight: 600;
-                }}
-                ul {{
-                    list-style-type: disc;
-                    padding-left: 20px;
-                }}
-                li {{
-                    margin-bottom: 5px;
-                }}
-            </style>
-        </head>
-        <body>
-            <h1>Changelog</h1>
-            {html_list_items}  <!-- 각 파일의 목록이 추가됨 -->
-        </body>
-        </html>
-        """
+        file_loader = FileSystemLoader('./templates')
+        env = Environment(loader=file_loader)
+        changelog_html = env.get_template('changelog.html')
+        data = {
+            'html_list_items': html_list_items
+        }
+        output = changelog_html.render(data)
 
-        changelog_html_path = "changelog_temp.html"
+        changelog_html_path = "changelog.html"
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
-            html_file.write(html_content)
+            html_file.write(output)
 
-        html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
-        cloudflare.s3_init(os.getenv('s3_endpoint_url'), os.getenv('s3_access_key_id'), os.getenv('s3_secret_access_key'))
-        cloudflare.s3_upload(changelog_html_path, os.getenv('s3_bucket_name'), f'changelog/{html_upload_name}.html')
-        s3_upload_file = os.getenv('s3_bucket_url') + f'/changelog/{html_upload_name}.html'
+        if s3:
+            html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
+            cloudflare.s3_init(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
+            cloudflare.s3_upload(changelog_html_path, s3['bucket_name'], f'changelog/{html_upload_name}.html')
+            s3_object_url = f'https://{s3['bucket_access_url']}/changelog/{html_upload_name}.html'
+        else:
+            s3_object_url = None
 
     # discord author info
     author_info = booth.crawling_product(url)
@@ -288,7 +257,7 @@ def init_update_check(item):
     if length_hint(thumblist) > 0: 
         thumb = thumblist[0]
 
-    api_url = 'http://booth-discord:5000/send_message'
+    api_url = f'{discord_api_url}/send_message'
 
     data = {
         'name': name,
@@ -299,19 +268,30 @@ def init_update_check(item):
         'author_info': author_info,
         'number_show': number_show,
         'changelog_show': changelog_show,
-        's3_upload_file': s3_upload_file,
-        'channel_id': discord_channel_id
+        'channel_id': discord_channel_id,
+        's3_object_url': s3_object_url
     }
 
     response = requests.post(api_url, json=data)
 
     if response.status_code == 200:
-        logger.info('booth_discord API 요청 성공')
+        logger.info('send_message API 요청 성공')
     else:
-        logger.error(f'booth_discord API 요청 실패: {response.text}')
+        logger.error(f'send_message API 요청 실패: {response.text}')
     
     if changelog_show is True:
-        os.remove(changelog_html_path)
+        if not s3:
+            api_url = f'{discord_api_url}/send_changelog'
+            data = {
+                'file': changelog_html_path,
+                'channel_id': discord_channel_id
+            }
+            response = requests.post(api_url, json=data)
+            if response.status_code == 200:
+                logger.info('send_changelog API 요청 성공')
+            else:
+                logger.error(f'send_changelog API 요청 실패: {response.text}')
+            os.remove(changelog_html_path)
     
     # delete all of 'marked_as'
     global delete_keys
@@ -533,18 +513,26 @@ if __name__ == "__main__":
         global current_time
         current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
         return current_time
-
+    
+    with open("config.json") as file:
+        config_json = simdjson.load(file)
+    discord_api_url = config_json['discord_api_url']
+    refresh_interval = int(config_json['refresh_interval'])
+    try:
+        s3 = config_json['s3']
+    except:
+        s3 = None
+    
     booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
 
     createFolder("./version")
     createFolder("./archive")
+    createFolder("./changelog")
     createFolder("./download")
     createFolder("./process")
 
-    refresh_interval = int(os.getenv('refresh_interval'))
-
     # booth_discord 컨테이너 시작 대기
-    sleep(30)
+    sleep(5)
 
     while True:
         booth_items = booth_db.get_booth_items()
@@ -561,7 +549,7 @@ if __name__ == "__main__":
         for item in booth_items:
             order_num = item[0]
             # BOOTH Heartbeat
-            # KT™ Sucks. Thank you.
+            # SKT™, KT™, U+™ Sucks. Thank you.
             
             try:
                 logger.info(f'[{order_num}] Checking BOOTH heartbeat')
