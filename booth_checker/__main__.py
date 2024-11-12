@@ -242,8 +242,13 @@ def init_update_check(item):
 
         if s3:
             html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
-            cloudflare.s3_init(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
-            cloudflare.s3_upload(changelog_html_path, s3['bucket_name'], f'changelog/{html_upload_name}.html')
+            try:
+                cloudflare.s3_init(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
+                cloudflare.s3_upload(changelog_html_path, s3['bucket_name'], f'changelog/{html_upload_name}.html')
+                logger.info(f'[{order_num}] Changelog uploaded to S3')
+            except Exception as e:
+                logger.error(f'[{order_num}] Error occurred while uploading changelog to S3: {e}')
+                s3_object_url = None
             s3_object_url = f'https://{s3['bucket_access_url']}/changelog/{html_upload_name}.html'
         else:
             s3_object_url = None
