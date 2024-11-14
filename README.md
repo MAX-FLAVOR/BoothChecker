@@ -8,28 +8,67 @@
 ### Docker-Compose
 ```
 services:
-  booth-update-checker:
-    image: ogunarmaya/booth-update-checker:latest
-    container_name: booth-update-checker
+  booth-checker:
+    image: ogunarmaya/booth-checker:latest
     volumes:
       - ./version:/root/booth-update-checker/version
       - ./archive:/root/booth-update-checker/archive
+      - ./config.json:/root/booth-update-checker/config.json
+    networks:
+      - booth-network
+    depends_on:
+      - booth-discord
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+      
+  booth-discord:
+    image: ogunarmaya/booth-discord:latest
+    volumes:
+      - ./version:/root/booth-update-checker/version
+      - ./config.json:/root/booth-update-checker/config.json
+    networks:
+      - booth-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  booth-network:
+    driver: bridge
 ```
 
 ---
 
-### .env
+### config.json
 
 ```
-refresh_interval = 600
-discord_bot_token = "YOUR_DISCORD_BOT_TOKEN"
-s3_endpoint_url = "YOUR_S3_ENDPOINT_URL"
-s3_access_key_id = "YOUR_S3_ACCESS_KEY_ID"
-s3_secret_access_key = "YOUR_S3_SECRET_ACCESS_KEY"
-s3_bucket_name = "YOUR_S3_BUCKET_NAME"
-s3_bucket_url = "YOUR_S3_BUCKET_URL"
+{
+    "refresh_interval": 600,
+    "discord_api_url": "http://booth-discord:5000",
+    "discord_bot_token": "YOUR_DISCORD_BOT_TOKEN",
+    "s3":
+        {
+            "endpoint_url": "YOUR_S3_ENDPOINT_URL",
+            "bucket_name": "YOUR_S3_BUCKET_NAME",
+            "bucket_access_url": "YOUR_S3_BUCKET_ACCESS_URL",
+            "access_key_id": "YOUR_S3_ACCESS_KEY_ID",
+            "secret_access_key": "YOUR_S3_SECRET_ACCESS_KEY"
+        }
+}
 ```
+
+#### `s3` (선택사항)
+
+changelog.html을 S3에 업로드하고, Discord Embed에서 마스킹된 링크로 제공합니다.
+
+`s3`를 사용하지 않을 경우, `s3` 부분을 제거하면 됩니다. 이 경우 changelog.html은 Discord에 직접 업로드됩니다.
 
 ---
 
