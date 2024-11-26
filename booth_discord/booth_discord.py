@@ -34,9 +34,9 @@ class DiscordBot(commands.Bot):
         async def booth_register(interaction: discord.Interaction, cookie: str):
             try:
                 self.booth_db.add_booth_account(cookie, interaction.user.id, interaction.channel.id)
-                await interaction.response.send_message("BOOTH 세션 쿠키 등록 완료", ephemeral=True)
+                await interaction.response.send_message("BOOTH 계정 등록 완료", ephemeral=True)
             except Exception as e:
-                await interaction.response.send_message(f"BOOTH 세션 쿠키 등록 실패: {e}", ephemeral=True)
+                await interaction.response.send_message(f"BOOTH 계정 등록 실패: {e}", ephemeral=True)
 
         @self.tree.command(name="booth_add_item", description="BOOTH 아이템 등록")
         @app_commands.describe(order_number="BOOTH 주문 번호를 입력 해주세요")
@@ -59,10 +59,10 @@ class DiscordBot(commands.Bot):
                     intent_encoding,
                 )
                 self.logger.info(f"User {interaction.user.id} is adding item with order number {order_number}")
-                await interaction.response.send_message("BOOTH 아이템 등록 완료", ephemeral=True)
+                await interaction.response.send_message(f"[{order_number}] 등록 완료", ephemeral=True)
             except Exception as e:
                 self.logger.error(f"Error occurred while adding BOOTH item: {e}")
-                await interaction.response.send_message(f"BOOTH 아이템 등록 실패: {e}", ephemeral=True)
+                await interaction.response.send_message(f"[{order_number}] 등록 실패: {e}", ephemeral=True)
 
         @self.tree.command(name="booth_remove_account", description="BOOTH 계정 삭제")
         async def booth_remove_account(interaction: discord.Interaction):
@@ -77,21 +77,22 @@ class DiscordBot(commands.Bot):
         async def booth_remove_item(interaction: discord.Interaction, order_number: str):
             try:
                 self.booth_db.remove_booth_item(interaction.user.id, order_number)
-                await interaction.response.send_message("BOOTH 아이템 삭제 완료", ephemeral=True)
+                await interaction.response.send_message(f"[{order_number}] 삭제 완료", ephemeral=True)
             except Exception as e:
-                await interaction.response.send_message(f"BOOTH 아이템 삭제 실패: {e}", ephemeral=True)
+                await interaction.response.send_message(f"[{order_number}] 삭제 실패: {e}", ephemeral=True)
 
-        @self.tree.command(name="booth_items_list", description="BOOTH 아이템 목록")
+        @self.tree.command(name="booth_items_list", description="아이템 목록 확인")
         async def booth_items_list(interaction: discord.Interaction):
             try:
                 items = self.booth_db.list_booth_items(interaction.user.id)
                 if items:
                     items_list = [row[0] for row in items]
-                    await interaction.response.send_message(f"BOOTH 아이템 목록: {items_list}", ephemeral=True)
+                    items_list = '\n'.join([f' - {i}' for i in items_list])
+                    await interaction.response.send_message(f"등록된 아이템 목록\n{items_list}", ephemeral=True)
                 else:
-                    await interaction.response.send_message("BOOTH 아이템이 없습니다", ephemeral=True)
+                    await interaction.response.send_message("등록된 아이템이 없습니다", ephemeral=True)
             except Exception as e:
-                await interaction.response.send_message(f"BOOTH 아이템 목록 불러오기 실패: {e}", ephemeral=True)
+                await interaction.response.send_message(f"아이템 목록 불러오기 실패: {e}", ephemeral=True)
 
     def setup_routes(self):
         @self.app.route("/send_message", methods=["POST"])
