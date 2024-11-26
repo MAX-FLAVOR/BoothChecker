@@ -4,6 +4,7 @@ services:
     volumes:
       - ./version:/root/booth-update-checker/version
       - ./archive:/root/booth-update-checker/archive
+      - ./templates:/root/booth-update-checker/templates
       - ./config.json:/root/booth-update-checker/config.json
     networks:
       - booth-network
