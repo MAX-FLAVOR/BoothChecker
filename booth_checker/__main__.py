@@ -40,14 +40,18 @@ def init_update_check(item):
     number_show = bool(item[4])
     changelog_show = bool(item[5])
     archive_this = bool(item[6])
-    booth_cookie = {"_plaza_session_nktz7u": item[7]}
-    discord_user_id = item[8]
-    discord_channel_id = item[9]
+    gift_item = bool(item[7])
+    booth_cookie = {"_plaza_session_nktz7u": item[8]}
+    discord_user_id = item[9]
+    discord_channel_id = item[10]
 
     download_short_list = list()
     thumblist = list()
-    download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
-
+    if gift_item:
+        download_url_list = booth.crawling_gift(order_num, booth_cookie, download_short_list, thumblist)
+    else:
+        download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
+    
     if download_url_list is None:
         logger.error(f'[{order_num}] BOOTH no responding')
         send_error_message(discord_channel_id, discord_user_id)
