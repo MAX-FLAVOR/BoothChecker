@@ -18,6 +18,7 @@ class BoothSQLite():
                             items.download_number_show,
                             items.changelog_show,
                             items.archive_this,
+                            items.gift_item,
                             accounts.session_cookie,
                             accounts.discord_user_id,
                             accounts.discord_channel_id
