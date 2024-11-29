@@ -16,13 +16,14 @@ class BoothSQLite():
 
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS booth_items (
-                booth_order_number INTEGER PRIMARY KEY,
+                booth_order_number TEXT PRIMARY KEY,
                 booth_item_name TEXT,
                 booth_check_only TEXT,
                 intent_encoding TEXT,
                 download_number_show BOOLEAN,
                 changelog_show BOOLEAN,
                 archive_this BOOLEAN,
+                gift_item BOOLEAN,
                 discord_user_id INTEGER,
                 FOREIGN KEY(discord_user_id) REFERENCES booth_accounts(discord_user_id)
             )
@@ -55,7 +56,7 @@ class BoothSQLite():
         # download_number_show False, changelog_show True, archive_this False
         if booth_account:
             self.cursor.execute('''
-                INSERT OR REPLACE INTO booth_items (booth_order_number, booth_item_name, booth_check_only, intent_encoding, download_number_show, changelog_show, archive_this, discord_user_id)
+                INSERT OR REPLACE INTO booth_items (booth_order_number, booth_item_name, booth_check_only, intent_encoding, download_number_show, changelog_show, archive_this, gift_item, discord_user_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (booth_order_number,
                   booth_item_name,
@@ -64,6 +65,29 @@ class BoothSQLite():
                   False,
                   True,
                   False,
+                  False,
+                  discord_user_id))
+            self.conn.commit()
+            return self.cursor.lastrowid
+        else:
+            raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
+
+    def add_gift_item(self, discord_user_id, booth_order_number, booth_item_name, intent_encoding):
+        booth_account = self.get_booth_account(discord_user_id)
+        # 서버에 부스 아이템 파일이 남지않도록 하드코딩
+        # download_number_show False, changelog_show True, archive_this False
+        if booth_account:
+            self.cursor.execute('''
+                INSERT OR REPLACE INTO booth_items (booth_order_number, booth_item_name, booth_check_only, intent_encoding, download_number_show, changelog_show, archive_this, gift_item, discord_user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (booth_order_number,
+                  booth_item_name,
+                  None,
+                  intent_encoding,
+                  False,
+                  True,
+                  False,
+                  True,
                   discord_user_id))
             self.conn.commit()
             return self.cursor.lastrowid
