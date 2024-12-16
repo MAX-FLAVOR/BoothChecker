@@ -1,0 +1,45 @@
+name: dev-build-push
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push (booth-checker)
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: ./docker/booth-checker/Dockerfile
+          tags: ogunarmaya/booth-checker:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+    
+      - name: Build and push (booth-discord)
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: ./docker/booth-discord/Dockerfile
+          tags: ogunarmaya/booth-discord:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Publish release
+        uses: ncipollo/release-action@v1
+        with:
+          generateReleaseNotes: true
