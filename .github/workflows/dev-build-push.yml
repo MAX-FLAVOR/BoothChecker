@@ -38,8 +38,3 @@ jobs:
           tags: ogunarmaya/booth-discord:dev
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Publish release
-        uses: ncipollo/release-action@v1
-        with:
-          generateReleaseNotes: true
