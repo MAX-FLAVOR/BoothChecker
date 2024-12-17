@@ -56,7 +56,7 @@ def init_update_check(item):
         try:
             name = download_url_list[1][0][0]
         except:
-            raise Exception(f'[{order_num}] BOOTH no responding')
+            raise Exception(f'[{order_num} download_url_list] : {download_url_list}')
     url = download_url_list[1][0][1]
 
     download_url_list = download_url_list[0]
