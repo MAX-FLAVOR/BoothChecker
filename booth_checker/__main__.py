@@ -51,13 +51,19 @@ def init_update_check(item):
     if download_url_list is None:
         logger.error(f'[{order_num}] BOOTH no responding')
         send_error_message(discord_channel_id, discord_user_id)
+    
+    try:
+        item_name = download_url_list[1][0][0]
+        item_url = download_url_list[1][0][1]
+    except:
+        logger.error(f'[{order_num}] BOOTH no responding')
+        send_error_message(discord_channel_id, discord_user_id)
+        raise Exception(f'[{order_num} download_url_list] : {download_url_list}')
 
     if name is None:
-        try:
-            name = download_url_list[1][0][0]
-        except:
-            raise Exception(f'[{order_num} download_url_list] : {download_url_list}')
-    url = download_url_list[1][0][1]
+        name = item_name
+            
+    url = item_url
 
     download_url_list = download_url_list[0]
 
@@ -576,7 +582,7 @@ if __name__ == "__main__":
             except PermissionError:
                 logger.error(f'[{order_num}] PermissionError occured')
             except Exception as e:
-                logger.error(f'[{order_num}] error occured on checking: {e}')
+                logger.error(f'[{order_num}] error occured on checking\n{e}')
             
         # 갱신 대기
         logger.info("waiting for refresh")
