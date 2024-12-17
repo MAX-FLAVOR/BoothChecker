@@ -49,24 +49,21 @@ def init_update_check(item):
     download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
 
     if download_url_list is None:
-        api_url = f'{discord_api_url}/send_error_message'
-
-        data = {
-            'channel_id': discord_channel_id,
-            'usr_id': discord_user_id
-        }
-
-        response = requests.post(api_url, json=data)
-
-        if response.status_code == 200:
-            logger.info('booth_discord API 요청 성공')
-        else:
-            logger.error(f'booth_discord API 요청 실패: {response.text}')
-            return
+        logger.error(f'[{order_num}] BOOTH no responding')
+        send_error_message(discord_channel_id, discord_user_id)
+    
+    try:
+        item_name = download_url_list[1][0][0]
+        item_url = download_url_list[1][0][1]
+    except:
+        logger.error(f'[{order_num}] BOOTH no responding')
+        send_error_message(discord_channel_id, discord_user_id)
+        raise Exception(f'[{order_num} download_url_list] : {download_url_list}')
 
     if name is None:
-        name = download_url_list[1][0][0]
-    url = download_url_list[1][0][1]
+        name = item_name
+            
+    url = item_url
 
     download_url_list = download_url_list[0]
 
@@ -505,6 +502,23 @@ def remove_element_mark(previous, root, root_name):
 def process_delete_keys(previous, root_name):
     del previous[root_name]
 
+
+def send_error_message(discord_channel_id, discord_user_id):
+    api_url = f'{discord_api_url}/send_error_message'
+
+    data = {
+        'channel_id': discord_channel_id,
+        'usr_id': discord_user_id
+    }
+
+    response = requests.post(api_url, json=data)
+
+    if response.status_code == 200:
+        logger.info('booth_discord API 요청 성공')
+    else:
+        logger.error(f'booth_discord API 요청 실패: {response.text}')
+    return
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
@@ -566,7 +580,9 @@ if __name__ == "__main__":
             try:
                 init_update_check(item)
             except PermissionError:
-                logger.error(f'[{order_num}] error occured on checking')
+                logger.error(f'[{order_num}] PermissionError occured')
+            except Exception as e:
+                logger.error(f'[{order_num}] error occured on checking\n{e}')
             
         # 갱신 대기
         logger.info("waiting for refresh")
