@@ -508,7 +508,7 @@ def send_error_message(discord_channel_id, discord_user_id):
 
     data = {
         'channel_id': discord_channel_id,
-        'usr_id': discord_user_id
+        'user_id': discord_user_id
     }
 
     response = requests.post(api_url, json=data)
