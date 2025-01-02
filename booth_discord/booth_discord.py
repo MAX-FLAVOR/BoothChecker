@@ -64,6 +64,29 @@ class DiscordBot(commands.Bot):
                 self.logger.error(f"Error occurred while adding BOOTH item: {e}")
                 await interaction.response.send_message(f"[{order_number}] 등록 실패: {e}", ephemeral=True)
 
+        @self.tree.command(name="booth_add_gift", description="BOOTH 선물 등록")
+        @app_commands.describe(order_number="BOOTH 선물코드 입력 해주세요")
+        @app_commands.describe(item_name="아이템 이름을 입력 해주세요")
+        @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요 (기본값: shift_jis)")
+        async def booth_add_gift(
+            interaction: discord.Interaction,
+            order_number: str,
+            item_name: str = None,
+            intent_encoding: str = "shift_jis"
+        ):
+            try:    
+                self.booth_db.add_gift_item(
+                    interaction.user.id,
+                    order_number,
+                    item_name,
+                    intent_encoding,
+                )
+                self.logger.info(f"User {interaction.user.id} is adding item with order number {order_number}")
+                await interaction.response.send_message(f"[{order_number}] 등록 완료", ephemeral=True)
+            except Exception as e:
+                self.logger.error(f"Error occurred while adding BOOTH item: {e}")
+                await interaction.response.send_message(f"[{order_number}] 등록 실패: {e}", ephemeral=True)
+
         @self.tree.command(name="booth_remove_account", description="BOOTH 계정 삭제")
         async def booth_remove_account(interaction: discord.Interaction):
             try:
@@ -88,7 +111,7 @@ class DiscordBot(commands.Bot):
                 if items:
                     items_list = [row[0] for row in items]
                     items_list = '\n'.join([f' - {i}' for i in items_list])
-                    await interaction.response.send_message(f"등록된 아이템 목록\n{items_list}", ephemeral=True)
+                    await interaction.response.send_message(f"# 등록된 아이템 목록\n{items_list}", ephemeral=True)
                 else:
                     await interaction.response.send_message("등록된 아이템이 없습니다", ephemeral=True)
             except Exception as e:
