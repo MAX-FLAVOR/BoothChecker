@@ -56,7 +56,16 @@ class BoothSQLite():
         # download_number_show False, changelog_show True, archive_this False
         if booth_account:
             self.cursor.execute('''
-                INSERT OR REPLACE INTO booth_items (booth_order_number, booth_item_name, booth_check_only, intent_encoding, download_number_show, changelog_show, archive_this, gift_item, discord_user_id)
+                INSERT OR REPLACE INTO booth_items (
+                                booth_order_number,
+                                booth_item_name,
+                                booth_check_only,
+                                intent_encoding,
+                                download_number_show,
+                                changelog_show,
+                                archive_this,
+                                gift_item,
+                                discord_user_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (booth_order_number,
                   booth_item_name,
@@ -78,8 +87,17 @@ class BoothSQLite():
         # download_number_show False, changelog_show True, archive_this False
         if booth_account:
             self.cursor.execute('''
-                INSERT OR REPLACE INTO booth_items (booth_order_number, booth_item_name, booth_check_only, intent_encoding, download_number_show, changelog_show, archive_this, gift_item, discord_user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO booth_items (
+                                booth_order_number,
+                                booth_item_name,
+                                booth_check_only,
+                                intent_encoding,
+                                download_number_show,
+                                changelog_show,
+                                archive_this,
+                                gift_item,
+                                discord_user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (booth_order_number,
                   booth_item_name,
                   None,
@@ -112,7 +130,7 @@ class BoothSQLite():
             try:
                 self.cursor.execute('''
                     DELETE FROM booth_items WHERE booth_order_number = ? AND discord_user_id = ?
-                ''', (int(booth_order_number), discord_user_id))
+                ''', (booth_order_number, discord_user_id))
                 self.conn.commit()
                 return self.cursor.lastrowid
             except Exception as e:
