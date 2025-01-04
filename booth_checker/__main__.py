@@ -555,7 +555,7 @@ if __name__ == "__main__":
     createFolder("./process")
 
     # booth_discord 컨테이너 시작 대기
-    sleep(5)
+    sleep(30)
 
     while True:
         booth_items = booth_db.get_booth_items()
