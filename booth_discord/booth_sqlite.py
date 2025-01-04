@@ -66,7 +66,7 @@ class BoothSQLite():
                                 archive_this,
                                 gift_item,
                                 discord_user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (booth_order_number,
                   booth_item_name,
                   booth_check_only,
