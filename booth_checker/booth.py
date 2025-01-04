@@ -25,7 +25,7 @@ def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None
 
         thumb_link = product_div.select_one("img")
         thumb_url = thumb_link.get("src")
-        if not thumblist is None:
+        if not thumblist is None: 
             thumblist.append(thumb_url)
         
         divs = product_div.select("div.legacy-list-item__center")
@@ -54,10 +54,9 @@ def crawling_gift(order_num, cookie, shortlist = None, thumblist = None):
     product_info_list = list()
     soup = BeautifulSoup(html, "html.parser")
     
-    # Work in progress
-    product_divs = soup.find_all("div", class_="sheet sheet--p400 mobile:pt-[13px] mobile:px-16 mobile:pb-8")
+    product_divs = soup.find_all("div", class_="rounded-16 bg-white p-40 mobile:px-16 mobile:pt-24 mobile:pb-40 mobile:rounded-none")
     for product_div in product_divs:
-        product_info = product_div.select("a")[1]
+        product_info = product_div.select_one("div.mt-24.text-left a") 
         product_name = product_info.get_text()
         product_url = product_info.get("href")
         product_info_list.append([product_name, product_url])
@@ -67,10 +66,10 @@ def crawling_gift(order_num, cookie, shortlist = None, thumblist = None):
         if not thumblist is None:
             thumblist.append(thumb_url)
         
-        divs = product_div.select("div.legacy-list-item__center")
+        divs = product_div.select("div.w-full.text-left")
         for div in divs:
-            download_link = div.select_one("a.nav-reverse")
-            filename_div = div.select_one("div.u-flex-1")
+            download_link = div.select_one("a.no-underline.flex.items-center.flex.gap-4")
+            filename_div = div.select_one("div[class='typography-14 !preserve-half-leading']")
             
             href = download_link.get("href")
             filename = filename_div.get_text()
