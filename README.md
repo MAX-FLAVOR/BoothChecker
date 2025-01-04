@@ -10,9 +10,10 @@ services:
   booth-checker:
     image: ogunarmaya/booth-checker:latest
     volumes:
-      - ./version:/root/booth-update-checker/version
-      - ./archive:/root/booth-update-checker/archive
-      - ./config.json:/root/booth-update-checker/config.json
+      - ./version:/root/boothchecker/version
+      - ./archive:/root/boothchecker/archive
+      - ./templates:/root/boothchecker/templates
+      - ./config.json:/root/boothchecker/config.json
     networks:
       - booth-network
     depends_on:
@@ -27,8 +28,8 @@ services:
   booth-discord:
     image: ogunarmaya/booth-discord:latest
     volumes:
-      - ./version:/root/booth-update-checker/version
-      - ./config.json:/root/booth-update-checker/config.json
+      - ./version:/root/boothchecker/version
+      - ./config.json:/root/boothchecker/config.json
     networks:
       - booth-network
     restart: unless-stopped
