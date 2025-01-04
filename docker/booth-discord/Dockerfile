@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 ENV TZ=Asia/Seoul
 RUN apt-get update && apt-get upgrade -y
-WORKDIR /root/booth-update-checker
+WORKDIR /root/boothchecker
 COPY ./booth_discord ./
 COPY ./docker/booth-discord/requirements.txt ./
 RUN pip install --upgrade pip
