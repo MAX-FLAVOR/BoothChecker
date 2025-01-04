@@ -1,8 +1,7 @@
-# booth-update-checker
+# BoothChecker
 
-[![docker-build-push](https://github.com/5ignal/booth-update-checker/actions/workflows/latest-build-push.yml/badge.svg)](https://github.com/5ignal/booth-update-checker/actions/workflows/latest-build-push.yml)
-
-[Docker Hub](https://hub.docker.com/r/ogunarmaya/booth-update-checker)
+[![docker-build-push](https://github.com/5ignal/BoothChecker/actions/workflows/latest-build-push.yml/badge.svg)](https://github.com/5ignal/BoothChecker/actions/workflows/latest-build-push.yml)
+[![dev-build-push](https://github.com/5ignal/BoothChecker/actions/workflows/dev-build-push.yml/badge.svg)](https://github.com/5ignal/BoothChecker/actions/workflows/dev-build-push.yml)
 
 ***
 ### Docker-Compose
