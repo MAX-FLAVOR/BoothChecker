@@ -117,6 +117,14 @@ class DiscordBot(commands.Bot):
             except Exception as e:
                 await interaction.response.send_message(f"아이템 목록 불러오기 실패: {e}", ephemeral=True)
 
+        @self.tree.command(name="booth_noti_channel", description="업데이트 알림을 받을 채널 설정")
+        async def update_discord_channel(interaction: discord.Interaction):
+            try:
+                self.booth_db.update_discord_channel(interaction.user.id, interaction.channel.id)
+                await interaction.response.send_message("업데이트 알림 채널 설정 완료", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"업데이트 알림 채널 설정 실패: {e}", ephemeral=True)
+
     def setup_routes(self):
         @self.app.route("/send_message", methods=["POST"])
         async def send_message():

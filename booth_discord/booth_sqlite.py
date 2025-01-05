@@ -147,3 +147,14 @@ class BoothSQLite():
             return self.cursor.fetchall()
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
+        
+    def update_discord_channel(self, discord_user_id, discord_channel_id):
+        booth_account = self.get_booth_account(discord_user_id)
+        if booth_account:
+            self.cursor.execute('''
+                UPDATE booth_accounts SET discord_channel_id = ? WHERE discord_user_id = ?
+            ''', (discord_channel_id, discord_user_id,))
+            self.conn.commit()
+            return True
+        else:
+            raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
