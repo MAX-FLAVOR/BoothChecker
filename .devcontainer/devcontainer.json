@@ -25,7 +25,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "pip install --upgrade pip && pip install --user -r requirements.txt",
+	"postCreateCommand": "pip install --upgrade pip && pip install --user -r docker/booth-checker/requirements.txt && pip install --user -r docker/booth-discord/requirements.txt",
 
 	// Configure tool-specific properties.
 	// "customizations": {},
