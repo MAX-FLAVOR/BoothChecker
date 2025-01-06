@@ -13,3 +13,5 @@ changelog.html
 *.png
 *.zip
 *.unitypackage
+
+test-*
