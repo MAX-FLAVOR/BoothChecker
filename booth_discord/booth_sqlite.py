@@ -95,13 +95,13 @@ class BoothSQLite():
         except Exception as e:
             raise Exception(e)
     
-    def remove_booth_item(self, discord_user_id, booth_order_number):
+    def remove_booth_item(self, discord_user_id, booth_item_number):
         booth_account = self.get_booth_account(discord_user_id)
         if booth_account:
             try:
                 self.cursor.execute('''
-                    DELETE FROM booth_items WHERE booth_order_number = ? AND discord_user_id = ?
-                ''', (booth_order_number, discord_user_id))
+                    DELETE FROM booth_items WHERE booth_item_number = ? AND discord_user_id = ?
+                ''', (booth_item_number, discord_user_id))
                 self.conn.commit()
                 return self.cursor.lastrowid
             except Exception as e:
@@ -113,7 +113,7 @@ class BoothSQLite():
         booth_account = self.get_booth_account(discord_user_id)
         if booth_account:
             self.cursor.execute('''
-                SELECT booth_order_number FROM booth_items WHERE discord_user_id = ?
+                SELECT booth_item_number FROM booth_items WHERE discord_user_id = ?
             ''', (discord_user_id,))
             return self.cursor.fetchall()
         else:
