@@ -50,16 +50,16 @@ def init_update_check(item):
         download_url_list = booth.crawling(order_num, item_number, booth_cookie, download_short_list, thumblist)
     
     if download_url_list is None:
-        logger.error(f'[{order_num}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id)
+        logger.error(f'[{item_number}] BOOTH no responding')
+        send_error_message(discord_channel_id, discord_user_id, item_number)
     
     try:
         item_name = download_url_list[1][0][0]
         item_url = download_url_list[1][0][1]
     except:
-        logger.error(f'[{order_num}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id)
-        raise Exception(f'[{order_num} download_url_list] : {download_url_list}')
+        logger.error(f'[{item_number}] BOOTH no responding')
+        send_error_message(discord_channel_id, discord_user_id, item_number)
+        raise Exception(f'[{item_number}-download_url_list] : {download_url_list}')
 
     if name is None:
         name = item_name
@@ -504,12 +504,13 @@ def process_delete_keys(previous, root_name):
     del previous[root_name]
 
 
-def send_error_message(discord_channel_id, discord_user_id):
+def send_error_message(discord_channel_id, discord_user_id, item_number):
     api_url = f'{discord_api_url}/send_error_message'
 
     data = {
         'channel_id': discord_channel_id,
-        'user_id': discord_user_id
+        'user_id': discord_user_id,
+        'item_number':  item_number
     }
 
     response = requests.post(api_url, json=data)

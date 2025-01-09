@@ -150,7 +150,8 @@ class DiscordBot(commands.Bot):
             data = await request.get_json()
             channel_id = data.get("channel_id")
             user_id = data.get("user_id")
-            await self.send_error_message(channel_id, user_id)
+            item_number = data.get("item_number")
+            await self.send_error_message(channel_id, user_id, item_number)
             return jsonify({"status": "Error message sent"}), 200
         
         @self.app.route("/send_changelog", methods=["POST"])
@@ -196,11 +197,11 @@ class DiscordBot(commands.Bot):
         channel = self.get_channel(int(channel_id))
         await channel.send(content="@here", embed=embed)
 
-    async def send_error_message(self, channel_id, discord_user_id):
+    async def send_error_message(self, channel_id, discord_user_id, item_number):
         channel = self.get_channel(int(channel_id))
         embed = discord.Embed(
             title="BOOTH 세션 쿠키 만료됨",
-            description="/booth_register 명령어로 세션 쿠키를 재등록해주세요",
+            description="item_number\n/booth_register 명령어로 세션 쿠키를 재등록해주세요",
             colour=discord.Color.red()
         )
         await channel.send(content=f'<@{discord_user_id}>', embed=embed)
