@@ -13,7 +13,7 @@ class BoothSQLite():
         self.cursor.execute('''
             SELECT  items.booth_order_number,
                     items.booth_item_name,
-                    items.booth_check_only,
+                    items.booth_item_number,
                     items.intent_encoding,
                     items.download_number_show,
                     items.changelog_show,

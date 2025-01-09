@@ -32,10 +32,7 @@ import cloudflare
 def init_update_check(item):
     order_num = item[0]
     name = item[1]
-    if item[2] is not None:
-        check_only_list = item[2].split(',')
-    else:
-        check_only_list = None
+    item_number = str(item[2])
     encoding = item[3]
     number_show = bool(item[4])
     changelog_show = bool(item[5])
@@ -50,7 +47,7 @@ def init_update_check(item):
     if gift_item:
         download_url_list = booth.crawling_gift(order_num, booth_cookie, download_short_list, thumblist)
     else:
-        download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
+        download_url_list = booth.crawling(order_num, item_number, booth_cookie, download_short_list, thumblist)
     
     if download_url_list is None:
         logger.error(f'[{order_num}] BOOTH no responding')
@@ -555,7 +552,7 @@ if __name__ == "__main__":
     createFolder("./process")
 
     # booth_discord 컨테이너 시작 대기
-    sleep(30)
+    sleep(15)
 
     while True:
         booth_items = booth_db.get_booth_items()

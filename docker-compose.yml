@@ -4,7 +4,6 @@ services:
     volumes:
       - ./version:/root/boothchecker/version
       - ./archive:/root/boothchecker/archive
-      - ./templates:/root/boothchecker/templates
       - ./config.json:/root/boothchecker/config.json
     networks:
       - booth-network
@@ -22,6 +21,19 @@ services:
     volumes:
       - ./version:/root/boothchecker/version
       - ./config.json:/root/boothchecker/config.json
+    networks:
+      - booth-network
+    depends_on:
+      - chrome
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  chrome:
+    image: selenium/standalone-chrome:latest
     networks:
       - booth-network
     restart: unless-stopped

@@ -1,3 +1,5 @@
 discord.py
 pytz
 quart
+selenium
+beautifulsoup4

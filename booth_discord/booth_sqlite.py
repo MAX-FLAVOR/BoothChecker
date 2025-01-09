@@ -1,4 +1,5 @@
 import sqlite3
+from booth import get_booth_order_info
 
 class BoothSQLite():
     def __init__(self, db):
@@ -18,7 +19,7 @@ class BoothSQLite():
             CREATE TABLE IF NOT EXISTS booth_items (
                 booth_order_number TEXT PRIMARY KEY,
                 booth_item_name TEXT,
-                booth_check_only TEXT,
+                booth_item_number INTEGER,
                 intent_encoding TEXT,
                 download_number_show BOOLEAN,
                 changelog_show BOOLEAN,
@@ -50,16 +51,17 @@ class BoothSQLite():
         self.conn.commit()
         return self.cursor.lastrowid
     
-    def add_booth_item(self, discord_user_id, booth_order_number, booth_item_name, booth_check_only, intent_encoding):
+    def add_booth_item(self, discord_user_id, booth_item_number, booth_item_name, intent_encoding):
         booth_account = self.get_booth_account(discord_user_id)
         # 서버에 부스 아이템 파일이 남지않도록 하드코딩
-        # download_number_show False, changelog_show True, archive_this False
+        # download_number_show True, changelog_show True, archive_this False
         if booth_account:
+            booth_order_info = get_booth_order_info(booth_item_number, ("_plaza_session_nktz7u", booth_account[0]))
             self.cursor.execute('''
                 INSERT OR REPLACE INTO booth_items (
                                 booth_order_number,
                                 booth_item_name,
-                                booth_check_only,
+                                booth_item_number,
                                 intent_encoding,
                                 download_number_show,
                                 changelog_show,
@@ -67,45 +69,14 @@ class BoothSQLite():
                                 gift_item,
                                 discord_user_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (booth_order_number,
+            ''', (booth_order_info[1],
                   booth_item_name,
-                  booth_check_only,
+                  booth_item_number,
                   intent_encoding,
-                  False,
+                  True,
                   True,
                   False,
-                  False,
-                  discord_user_id))
-            self.conn.commit()
-            return self.cursor.lastrowid
-        else:
-            raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
-
-    def add_gift_item(self, discord_user_id, booth_order_number, booth_item_name, intent_encoding):
-        booth_account = self.get_booth_account(discord_user_id)
-        # 서버에 부스 아이템 파일이 남지않도록 하드코딩
-        # download_number_show False, changelog_show True, archive_this False
-        if booth_account:
-            self.cursor.execute('''
-                INSERT OR REPLACE INTO booth_items (
-                                booth_order_number,
-                                booth_item_name,
-                                booth_check_only,
-                                intent_encoding,
-                                download_number_show,
-                                changelog_show,
-                                archive_this,
-                                gift_item,
-                                discord_user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (booth_order_number,
-                  booth_item_name,
-                  None,
-                  intent_encoding,
-                  False,
-                  True,
-                  False,
-                  True,
+                  booth_order_info[0],
                   discord_user_id))
             self.conn.commit()
             return self.cursor.lastrowid
@@ -115,7 +86,7 @@ class BoothSQLite():
     def remove_booth_account(self, discord_user_id):
         try:
             if self.list_booth_items(discord_user_id):
-                raise Exception("BOOTH 아이템이 등록되어 있습니다.")
+                raise Exception("BOOTH 아이템이 등록되어 있습니다. 먼저 아이템을 삭제해주세요.")
             self.cursor.execute('''
                 DELETE FROM booth_accounts WHERE discord_user_id = ?
             ''', (discord_user_id,))
