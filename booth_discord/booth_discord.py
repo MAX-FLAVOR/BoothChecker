@@ -78,7 +78,7 @@ class DiscordBot(commands.Bot):
                 await interaction.response.send_message(f"BOOTH 계정 삭제 실패: {e}", ephemeral=True)
 
         @self.tree.command(name="booth_remove_item", description="BOOTH 아이템 삭제")
-        @app_commands.describe(item="BOOTH 주문 번호 또는 선물 코드를 입력 해주세요")
+        @app_commands.describe(item="BOOTH 상품 번호를 입력해주세요")
         async def booth_remove_item(interaction: discord.Interaction, item: str):
             try:
                 self.booth_db.remove_booth_item(interaction.user.id, item)
