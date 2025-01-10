@@ -290,7 +290,11 @@ def init_update_check(item):
         for booth_item in download_url_list:  # 각 파일에 대해 처리
             download_path = f'./download/{booth_item[1]}'
             logger.info(f'[{order_num}] parsing {booth_item[0]} structure')
-            init_file_process(download_path, booth_item[1], version_json, encoding)
+            try:
+                init_file_process(download_path, booth_item[1], version_json, encoding)
+            except Exception as e:
+                logger.error(f'[{order_num}] error occured on parsing {booth_item[0]}\n{e}')
+                continue
 
             # 초기화
             path_list = []
@@ -509,7 +513,10 @@ def try_extract(input_path, input_filename, output_path, encoding):
         zip_file = zipfile.ZipFile(temp_output, 'r', metadata_encoding=encoding)
 
         os.makedirs(output_path, exist_ok=True)
-        zip_file.extractall(output_path)
+        try:
+            zip_file.extractall(output_path)
+        except:
+            raise
         zip_file.close()
         os.remove(temp_output)
     elif zip_type == 2:
