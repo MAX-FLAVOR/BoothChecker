@@ -16,7 +16,7 @@ def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None
         product_info = product_div.select("a")[1]
         product_name = product_info.get_text()
         product_url = product_info.get("href")
-        product_number = re.sub(r'[^0-9]', '', product_url)
+        product_number = re.search(r'/items/(\d+)', product_url).group(1)
         
         if product_only is not None and product_number not in product_only:
             continue
