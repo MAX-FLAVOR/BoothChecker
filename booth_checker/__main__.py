@@ -468,31 +468,35 @@ def init_file_process(input_path, filename, version_json, encoding):
         filehash = "DIRECTORY"
         
     process_path = f'./process/{pathstr}'
-    zip_type = try_extract(input_path, filename, process_path, encoding)
-    
-    json = version_json['files']
-    for entry in range(0, len(json_level) - 1, 1):
-        pre_json = json.get(json_level[entry], None)
-        json = pre_json.get('files', None)
-
-    if json is None:
-        json = pre_json['files'] = {}
+    zip_type = 0
+    try:
+        zip_type = try_extract(input_path, filename, process_path, encoding)
         
-    pre_json = json
-    json = pre_json.get(filename, None)
-    
-    if json is None:
-        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
-    else:
-        pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
-        
-    if zip_type > 0 or os.path.isdir(process_path):
-        for new_filename in os.listdir(process_path):
-            new_process_path = os.path.join(process_path, new_filename)
-            init_file_process(new_process_path, new_filename, version_json, encoding)
+        json = version_json['files']
+        for entry in range(0, len(json_level) - 1, 1):
+            pre_json = json.get(json_level[entry], None)
+            json = pre_json.get('files', None)
 
-    json_level.pop()
-    end_file_process(zip_type, process_path)
+        if json is None:
+            json = pre_json['files'] = {}
+            
+        pre_json = json
+        json = pre_json.get(filename, None)
+        
+        if json is None:
+            pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+        else:
+            pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
+            
+        if zip_type > 0 or os.path.isdir(process_path):
+            for new_filename in os.listdir(process_path):
+                new_process_path = os.path.join(process_path, new_filename)
+                init_file_process(new_process_path, new_filename, version_json, encoding)
+    except Exception as e:
+        raise
+    finally:
+        json_level.pop()
+        end_file_process(zip_type, process_path)
     
         
 def end_file_process(zip_type, process_path):
