@@ -201,7 +201,7 @@ class DiscordBot(commands.Bot):
         channel = self.get_channel(int(channel_id))
         embed = discord.Embed(
             title="BOOTH 세션 쿠키 만료됨",
-            description=f"## 아이템 번호 : {item_number}\n/booth_register 명령어로 세션 쿠키를 재등록해주세요",
+            description=f"## 아이템 번호 : {item_number}\n/booth 명령어로 쿠키를 재등록해주세요",
             colour=discord.Color.red()
         )
         await channel.send(content=f'<@{discord_user_id}>', embed=embed)
