@@ -14,4 +14,4 @@ changelog.html
 *.zip
 *.unitypackage
 
-test-*
+*test*
