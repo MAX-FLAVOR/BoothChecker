@@ -12,7 +12,6 @@ services:
     volumes:
       - ./version:/root/boothchecker/version
       - ./archive:/root/boothchecker/archive
-      - ./templates:/root/boothchecker/templates
       - ./config.json:/root/boothchecker/config.json
     depends_on:
       - booth-discord
