@@ -6,7 +6,7 @@ import requests
 import re
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import sleep
 from jinja2 import Environment, FileSystemLoader
 
@@ -70,7 +70,7 @@ def init_update_check(item):
 
     version_filename = order_num
     
-    version_file_path = f'./version/{version_filename}.json'
+    version_file_path = f'./version/json/{version_filename}.json'
 
     if not os.path.exists(version_file_path):
         logger.info(f'[{order_num}] version file not found')
@@ -317,7 +317,7 @@ def init_update_check(item):
         }
         output = changelog_html.render(data)
 
-        changelog_html_path = "changelog.html"
+        changelog_html_path = "changelog/changelog.html"
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
@@ -693,7 +693,7 @@ def send_error_message(discord_channel_id, discord_user_id, item_number):
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
+        format='[%(asctime)s] - [%(levelname)s] - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     logger = logging.getLogger(__name__)
@@ -712,19 +712,23 @@ if __name__ == "__main__":
         s3 = config_json['s3']
     except:
         s3 = None
-    
-    booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
 
     createFolder("./version")
+    createFolder("./version/db")
+    createFolder("./version/json")
     createFolder("./archive")
     createFolder("./changelog")
     createFolder("./download")
     createFolder("./process")
 
+    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
+
     # booth_discord 컨테이너 시작 대기
     sleep(15)
 
     while True:
+        logger.info("BoothChecker started")
+
         booth_items = booth_db.get_booth_items()
     
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
@@ -756,5 +760,6 @@ if __name__ == "__main__":
                 logger.error(f'[{order_num}] error occured on checking\n{e}')
             
         # 갱신 대기
-        logger.info("waiting for refresh")
+        logger.info("BoothChecker finished")
+        logger.info(f"Next check will be at {datetime.now() + timedelta(seconds=refresh_interval)}")
         sleep(refresh_interval)

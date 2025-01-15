@@ -12,7 +12,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def main():
-    booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
+    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
     bot = booth_discord.DiscordBot(booth_db, logger)
     with open("config.json") as file:
         config_json = json.load(file)
