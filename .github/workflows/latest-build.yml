@@ -1,12 +1,9 @@
-name: dev-build-push
+name: latest-build
 
 on:
-  pull_request:
-    branches:
-      - dev
   push:
-    branches:
-      - dev
+    tags:
+      - 'v*'
 
 jobs:
   docker:
@@ -29,7 +26,7 @@ jobs:
         with:
           push: true
           file: ./docker/booth-checker/Dockerfile
-          tags: ogunarmaya/booth-checker:dev
+          tags: ogunarmaya/booth-checker:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
     
@@ -38,6 +35,11 @@ jobs:
         with:
           push: true
           file: ./docker/booth-discord/Dockerfile
-          tags: ogunarmaya/booth-discord:dev
+          tags: ogunarmaya/booth-discord:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Publish release
+        uses: ncipollo/release-action@v1
+        with:
+          generateReleaseNotes: true
