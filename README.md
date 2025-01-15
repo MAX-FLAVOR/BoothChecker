@@ -1,7 +1,7 @@
 # BoothChecker
 
-[![docker-build-push](https://github.com/5ignal/BoothChecker/actions/workflows/latest-build-push.yml/badge.svg)](https://github.com/5ignal/BoothChecker/actions/workflows/latest-build-push.yml)
-[![dev-build-push](https://github.com/5ignal/BoothChecker/actions/workflows/dev-build-push.yml/badge.svg)](https://github.com/5ignal/BoothChecker/actions/workflows/dev-build-push.yml)
+[![latest](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/latest-build.yml/badge.svg)](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/latest-build.yml)
+[![dev](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/dev-build.yml/badge.svg)](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/dev-build.yml)
 
 ***
 ### Docker-Compose
