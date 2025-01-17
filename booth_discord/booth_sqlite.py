@@ -32,16 +32,6 @@ class BoothSQLite():
 
     def __del__(self):
         self.conn.close()
-
-    def get_booth_account(self, discord_user_id):
-        self.cursor.execute('''
-            SELECT * FROM booth_accounts
-            WHERE discord_user_id = ?
-        ''', (discord_user_id,))
-        result = self.cursor.fetchone()
-        if result:
-            return result
-        return None
     
     def add_booth_account(self, session_cookie, discord_user_id, discord_channel_id):
         self.cursor.execute('''
@@ -53,6 +43,8 @@ class BoothSQLite():
     
     def add_booth_item(self, discord_user_id, booth_item_number, booth_item_name, intent_encoding):
         booth_account = self.get_booth_account(discord_user_id)
+        if self.is_item_duplicate(booth_item_number, discord_user_id):
+            raise Exception("이미 등록된 아이템입니다.")
         # 서버에 부스 아이템 파일이 남지않도록 하드코딩
         # download_number_show True, changelog_show True, archive_this False
         if booth_account:
@@ -108,6 +100,26 @@ class BoothSQLite():
                 raise Exception(e)
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
+        
+    def get_booth_account(self, discord_user_id):
+        self.cursor.execute('''
+            SELECT * FROM booth_accounts
+            WHERE discord_user_id = ?
+        ''', (discord_user_id,))
+        result = self.cursor.fetchone()
+        if result:
+            return result
+        return None
+
+    def is_item_duplicate(self, booth_item_number, discord_user_id):
+        self.cursor.execute('''
+            SELECT * FROM booth_items
+            WHERE booth_item_number = ? AND discord_user_id = ?
+        ''', (booth_item_number, discord_user_id))
+        result = self.cursor.fetchone()
+        if result:
+            return True
+        return False
     
     def list_booth_items(self, discord_user_id):
         booth_account = self.get_booth_account(discord_user_id)
