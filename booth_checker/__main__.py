@@ -6,7 +6,7 @@ import requests
 import re
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import sleep
 from jinja2 import Environment, FileSystemLoader
 
@@ -32,10 +32,7 @@ import cloudflare
 def init_update_check(item):
     order_num = item[0]
     name = item[1]
-    if item[2] is not None:
-        check_only_list = item[2].split(',')
-    else:
-        check_only_list = None
+    item_number = str(item[2])
     encoding = item[3]
     number_show = bool(item[4])
     changelog_show = bool(item[5])
@@ -50,19 +47,19 @@ def init_update_check(item):
     if gift_item:
         download_url_list = booth.crawling_gift(order_num, booth_cookie, download_short_list, thumblist)
     else:
-        download_url_list = booth.crawling(order_num, check_only_list, booth_cookie, download_short_list, thumblist)
+        download_url_list = booth.crawling(order_num, item_number, booth_cookie, download_short_list, thumblist)
     
     if download_url_list is None:
-        logger.error(f'[{order_num}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id)
+        logger.error(f'[{item_number}] BOOTH no responding')
+        send_error_message(discord_channel_id, discord_user_id, item_number)
     
     try:
         item_name = download_url_list[1][0][0]
         item_url = download_url_list[1][0][1]
     except:
-        logger.error(f'[{order_num}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id)
-        raise Exception(f'[{order_num} download_url_list] : {download_url_list}')
+        logger.error(f'[{item_number}] BOOTH no responding')
+        send_error_message(discord_channel_id, discord_user_id, item_number)
+        raise Exception(f'[{item_number}-download_url_list] : {download_url_list}')
 
     if name is None:
         name = item_name
@@ -73,7 +70,7 @@ def init_update_check(item):
 
     version_filename = order_num
     
-    version_file_path = f'./version/{version_filename}.json'
+    version_file_path = f'./version/json/{version_filename}.json'
 
     if not os.path.exists(version_file_path):
         logger.info(f'[{order_num}] version file not found')
@@ -108,6 +105,86 @@ def init_update_check(item):
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
     
+    
+    def build_tree(paths):
+        tree = {}
+        path_stack = []
+        for item in paths:
+            line_str = item.get('line_str', '')
+            status = item.get('status', 0)
+
+            # 후행 공백만 제거하여 선행 공백을 보존
+            line_str = line_str.rstrip()
+
+            # 선행 공백의 수를 계산하여 들여쓰기 수준 결정
+            indent_match = re.match(r'^(\s*)(.*)', line_str)
+            if indent_match:
+                leading_spaces = indent_match.group(1)
+                indent = len(leading_spaces)
+                content = indent_match.group(2)
+            else:
+                indent = 0
+                content = line_str
+
+            # content에서 상태 문자열 제거
+            content = re.sub(r'\s*\(.*\)$', '', content)
+
+            # 깊이 계산 (들여쓰기 수준에 따라)
+            depth = indent // 4  # 공백 4칸당 한 레벨로 설정 (필요에 따라 조정)
+
+            # 현재 깊이에 맞게 경로 스택 조정
+            path_stack = path_stack[:depth]
+            path_stack.append(content)
+
+            # 트리 빌드
+            node = tree
+            for part in path_stack[:-1]:
+                node = node.setdefault(part, {})
+            # 현재 노드에 상태 정보 저장
+            current_node = node.setdefault(path_stack[-1], {})
+            current_node['_status'] = status
+        return tree
+
+    def tree_to_html(tree):
+        html = '<ul>\n'  # 시작 태그에 줄바꿈 추가
+        for key, subtree in tree.items():
+            if key == '_status':
+                continue  # 상태 정보는 별도로 처리
+            status = subtree.get('_status', 0)
+
+            # 상태에 따른 컬러 지정
+            line_color = 'rgb(255, 255, 255)'  # 기본 색상 (흰색)
+            if status == 1:
+                line_color = 'rgb(125, 164, 68)'  # Added (녹색 계열)
+            elif status == 2:
+                line_color = 'rgb(252, 101, 89)'  # Deleted (빨간색 계열)
+            elif status == 3:
+                line_color = 'rgb(128, 161, 209)'  # Changed (파란색 계열)
+
+            # 상태 문자열 추가
+            status_str = ''
+            if status == 1:
+                status_str = ' (Added)'
+            elif status == 2:
+                status_str = ' (Deleted)'
+            elif status == 3:
+                status_str = ' (Changed)'
+
+            # '_status' 키를 제외한 나머지로 재귀 호출
+            child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
+
+            if child_subtree:
+                # 자식이 있는 경우
+                html += f'<li><span style="color:{line_color}">{key}{status_str}</span>\n'
+                html += tree_to_html(child_subtree)
+                html += '</li>\n'
+            else:
+                # 자식이 없는 경우
+                html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>\n'
+        html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
+        return html
+
+
     def build_tree(paths):
         tree = {}
         path_stack = []
@@ -213,7 +290,11 @@ def init_update_check(item):
         for booth_item in download_url_list:  # 각 파일에 대해 처리
             download_path = f'./download/{booth_item[1]}'
             logger.info(f'[{order_num}] parsing {booth_item[0]} structure')
-            init_file_process(download_path, booth_item[1], version_json, encoding)
+            try:
+                init_file_process(download_path, booth_item[1], version_json, encoding)
+            except Exception as e:
+                logger.error(f'[{order_num}] error occured on parsing {booth_item[0]}\n{e}')
+                continue
 
             # 초기화
             path_list = []
@@ -236,7 +317,7 @@ def init_update_check(item):
         }
         output = changelog_html.render(data)
 
-        changelog_html_path = "changelog.html"
+        changelog_html_path = "changelog/changelog.html"
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
@@ -387,31 +468,35 @@ def init_file_process(input_path, filename, version_json, encoding):
         filehash = "DIRECTORY"
         
     process_path = f'./process/{pathstr}'
-    zip_type = try_extract(input_path, filename, process_path, encoding)
-    
-    json = version_json['files']
-    for entry in range(0, len(json_level) - 1, 1):
-        pre_json = json.get(json_level[entry], None)
-        json = pre_json.get('files', None)
-
-    if json is None:
-        json = pre_json['files'] = {}
+    zip_type = 0
+    try:
+        zip_type = try_extract(input_path, filename, process_path, encoding)
         
-    pre_json = json
-    json = pre_json.get(filename, None)
-    
-    if json is None:
-        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
-    else:
-        pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
-        
-    if zip_type > 0 or os.path.isdir(process_path):
-        for new_filename in os.listdir(process_path):
-            new_process_path = os.path.join(process_path, new_filename)
-            init_file_process(new_process_path, new_filename, version_json, encoding)
+        json = version_json['files']
+        for entry in range(0, len(json_level) - 1, 1):
+            pre_json = json.get(json_level[entry], None)
+            json = pre_json.get('files', None)
 
-    json_level.pop()
-    end_file_process(zip_type, process_path)
+        if json is None:
+            json = pre_json['files'] = {}
+            
+        pre_json = json
+        json = pre_json.get(filename, None)
+        
+        if json is None:
+            pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+        else:
+            pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
+            
+        if zip_type > 0 or os.path.isdir(process_path):
+            for new_filename in os.listdir(process_path):
+                new_process_path = os.path.join(process_path, new_filename)
+                init_file_process(new_process_path, new_filename, version_json, encoding)
+    except Exception as e:
+        raise
+    finally:
+        json_level.pop()
+        end_file_process(zip_type, process_path)
     
         
 def end_file_process(zip_type, process_path):
@@ -432,7 +517,10 @@ def try_extract(input_path, input_filename, output_path, encoding):
         zip_file = zipfile.ZipFile(temp_output, 'r', metadata_encoding=encoding)
 
         os.makedirs(output_path, exist_ok=True)
-        zip_file.extractall(output_path)
+        try:
+            zip_file.extractall(output_path)
+        except:
+            raise
         zip_file.close()
         os.remove(temp_output)
     elif zip_type == 2:
@@ -506,13 +594,92 @@ def remove_element_mark(previous, root, root_name):
 def process_delete_keys(previous, root_name):
     del previous[root_name]
 
+def build_tree(paths):
+    tree = {}
+    path_stack = []
+    for item in paths:
+        line_str = item.get('line_str', '')
+        status = item.get('status', 0)
 
-def send_error_message(discord_channel_id, discord_user_id):
+        # 후행 공백만 제거하여 선행 공백을 보존
+        line_str = line_str.rstrip()
+
+        # 선행 공백의 수를 계산하여 들여쓰기 수준 결정
+        indent_match = re.match(r'^(\s*)(.*)', line_str)
+        if indent_match:
+            leading_spaces = indent_match.group(1)
+            indent = len(leading_spaces)
+            content = indent_match.group(2)
+        else:
+            indent = 0
+            content = line_str
+
+        # content에서 상태 문자열 제거
+        content = re.sub(r'\s*\(.*\)$', '', content)
+
+        # 깊이 계산 (들여쓰기 수준에 따라)
+        depth = indent // 4  # 공백 4칸당 한 레벨로 설정 (필요에 따라 조정)
+
+        # 현재 깊이에 맞게 경로 스택 조정
+        path_stack = path_stack[:depth]
+        path_stack.append(content)
+
+        # 트리 빌드
+        node = tree
+        for part in path_stack[:-1]:
+            node = node.setdefault(part, {})
+        # 현재 노드에 상태 정보 저장
+        current_node = node.setdefault(path_stack[-1], {})
+        current_node['_status'] = status
+    return tree
+
+def tree_to_html(tree):
+    html = '<ul>\n'  # 시작 태그에 줄바꿈 추가
+    for key, subtree in tree.items():
+        if key == '_status':
+            continue  # 상태 정보는 별도로 처리
+        status = subtree.get('_status', 0)
+
+        # 상태에 따른 컬러 지정
+        line_color = 'rgb(255, 255, 255)'  # 기본 색상 (흰색)
+        if status == 1:
+            line_color = 'rgb(125, 164, 68)'  # Added (녹색 계열)
+        elif status == 2:
+            line_color = 'rgb(252, 101, 89)'  # Deleted (빨간색 계열)
+        elif status == 3:
+            line_color = 'rgb(128, 161, 209)'  # Changed (파란색 계열)
+
+        # 상태 문자열 추가
+        status_str = ''
+        if status == 1:
+            status_str = ' (Added)'
+        elif status == 2:
+            status_str = ' (Deleted)'
+        elif status == 3:
+            status_str = ' (Changed)'
+
+        # '_status' 키를 제외한 나머지로 재귀 호출
+        child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
+
+        if child_subtree:
+            # 자식이 있는 경우
+            html += f'<li><span style="color:{line_color}">{key}{status_str}</span>\n'
+            html += tree_to_html(child_subtree)
+            html += '</li>\n'
+        else:
+            # 자식이 없는 경우
+            html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>\n'
+    html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
+    return html
+
+
+def send_error_message(discord_channel_id, discord_user_id, item_number):
     api_url = f'{discord_api_url}/send_error_message'
 
     data = {
         'channel_id': discord_channel_id,
-        'user_id': discord_user_id
+        'user_id': discord_user_id,
+        'item_number':  item_number
     }
 
     response = requests.post(api_url, json=data)
@@ -526,7 +693,7 @@ def send_error_message(discord_channel_id, discord_user_id):
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
+        format='[%(asctime)s] - [%(levelname)s] - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     logger = logging.getLogger(__name__)
@@ -545,19 +712,23 @@ if __name__ == "__main__":
         s3 = config_json['s3']
     except:
         s3 = None
-    
-    booth_db = booth_sqlite.BoothSQLite('./version/booth.db')
 
     createFolder("./version")
+    createFolder("./version/db")
+    createFolder("./version/json")
     createFolder("./archive")
     createFolder("./changelog")
     createFolder("./download")
     createFolder("./process")
 
+    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
+
     # booth_discord 컨테이너 시작 대기
-    sleep(30)
+    sleep(15)
 
     while True:
+        logger.info("BoothChecker started")
+
         booth_items = booth_db.get_booth_items()
     
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
@@ -589,5 +760,6 @@ if __name__ == "__main__":
                 logger.error(f'[{order_num}] error occured on checking\n{e}')
             
         # 갱신 대기
-        logger.info("waiting for refresh")
+        logger.info("BoothChecker finished")
+        logger.info(f"Next check will be at {datetime.now() + timedelta(seconds=refresh_interval)}")
         sleep(refresh_interval)

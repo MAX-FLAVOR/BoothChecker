@@ -1,7 +1,7 @@
 # BoothChecker
 
-[![docker-build-push](https://github.com/5ignal/BoothChecker/actions/workflows/latest-build-push.yml/badge.svg)](https://github.com/5ignal/BoothChecker/actions/workflows/latest-build-push.yml)
-[![dev-build-push](https://github.com/5ignal/BoothChecker/actions/workflows/dev-build-push.yml/badge.svg)](https://github.com/5ignal/BoothChecker/actions/workflows/dev-build-push.yml)
+[![latest](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/latest-build.yml/badge.svg)](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/latest-build.yml)
+[![dev](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/dev-build.yml/badge.svg)](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/dev-build.yml)
 
 ***
 ### Docker-Compose
@@ -12,10 +12,7 @@ services:
     volumes:
       - ./version:/root/boothchecker/version
       - ./archive:/root/boothchecker/archive
-      - ./templates:/root/boothchecker/templates
       - ./config.json:/root/boothchecker/config.json
-    networks:
-      - booth-network
     depends_on:
       - booth-discord
     restart: unless-stopped
@@ -30,8 +27,8 @@ services:
     volumes:
       - ./version:/root/boothchecker/version
       - ./config.json:/root/boothchecker/config.json
-    networks:
-      - booth-network
+    depends_on:
+      - chrome
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -39,9 +36,14 @@ services:
         max-size: "10m"
         max-file: "3"
 
-networks:
-  booth-network:
-    driver: bridge
+  chrome:
+    image: selenium/standalone-chrome:latest
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 ```
 
 ---

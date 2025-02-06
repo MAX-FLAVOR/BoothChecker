@@ -1,4 +1,4 @@
-name: dev-build-push
+name: dev
 
 on:
   pull_request:
