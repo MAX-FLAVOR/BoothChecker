@@ -12,13 +12,14 @@ class BoothSQLite():
     def get_booth_items(self):
         self.cursor.execute('''
             SELECT  items.booth_order_number,
-                    items.booth_item_name,
                     items.booth_item_number,
+                    items.item_name,
                     items.intent_encoding,
                     items.download_number_show,
                     items.changelog_show,
                     items.archive_this,
                     items.gift_item,
+                    items.summary_this,
                     accounts.session_cookie,
                     accounts.discord_user_id,
                     accounts.discord_channel_id

@@ -9,7 +9,7 @@ class openai_api:
 
         system_role = dict()
         system_role["role"] = "developer"
-        system_role["content"] = """파일명, 파일상태값(Added, Deleted, Changed)를 주면 주요 변경점을 간단하게 한국어로 요약해줘"""
+        system_role["content"] = """너는 체인지 로그 요약 전문가야. 내가 줄 체인지 로그 내용을 핵심만 간결하게 한국어로 요약해. 그리고 제목 마크다운은 사용하면 안돼"""
 
         user_role = dict()
         user_role["role"] = "user"
@@ -21,6 +21,7 @@ class openai_api:
         chatgpt_request = self.client.chat.completions.create(
             model = "gpt-4o-mini",
             messages = messages,
+            temperature = 0.2,
         )
         chatgpt_response = chatgpt_request.choices[0].message.content
         return(chatgpt_response)

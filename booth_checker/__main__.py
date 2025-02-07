@@ -32,16 +32,17 @@ import chatgpt
 
 def init_update_check(item):
     order_num = item[0]
-    name = item[1]
-    item_number = str(item[2])
+    item_number = str(item[1])
+    name = item[2]
     encoding = item[3]
     number_show = bool(item[4])
     changelog_show = bool(item[5])
     archive_this = bool(item[6])
     gift_item = bool(item[7])
-    booth_cookie = {"_plaza_session_nktz7u": item[8]}
-    discord_user_id = item[9]
-    discord_channel_id = item[10]
+    summary_this = bool(item[8])
+    booth_cookie = {"_plaza_session_nktz7u": item[9]}
+    discord_user_id = item[10]
+    discord_channel_id = item[11]
 
     download_short_list = list()
     thumblist = list()
@@ -52,7 +53,7 @@ def init_update_check(item):
     
     if download_url_list is None:
         logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id, item_number)
+        send_error_message(discord_channel_id, discord_user_id, item_number, order_num)
     
     try:
         item_name = download_url_list[1][0][0]
@@ -165,8 +166,8 @@ def init_update_check(item):
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
-
-        summary = chatgpt.chat(files_list(tree))
+        if summary_this and os.getenv('OPENAI_API_KEY'):
+            summary = chatgpt.chat(files_list(tree))
 
         if s3:
             html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
@@ -546,7 +547,7 @@ def files_list(tree):
 
     return raw_data
 
-def send_error_message(discord_channel_id, discord_user_id, item_number):
+def send_error_message(discord_channel_id, discord_user_id, item_number, order_num):
     api_url = f'{discord_api_url}/send_error_message'
 
     data = {
@@ -596,7 +597,8 @@ if __name__ == "__main__":
 
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
 
-    chatgpt = chatgpt.openai_api()
+    if os.getenv('OPENAI_API_KEY'):
+        chatgpt = chatgpt.openai_api()
 
     # booth_discord 컨테이너 시작 대기
     sleep(15)
