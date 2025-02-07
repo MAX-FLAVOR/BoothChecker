@@ -6,3 +6,4 @@ unitypackage_extractor
 pytz
 boto3
 jinja2
+openai

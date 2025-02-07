@@ -129,6 +129,7 @@ class DiscordBot(commands.Bot):
             changelog_show = data.get("changelog_show")
             channel_id = data.get("channel_id")
             s3_object_url = data.get("s3_object_url")
+            summary = data.get("summary")
 
             await self.send_message(
                 name,
@@ -140,7 +141,8 @@ class DiscordBot(commands.Bot):
                 number_show,
                 changelog_show,
                 channel_id,
-                s3_object_url
+                s3_object_url,
+                summary
             )
 
             return jsonify({"status": "Message sent"}), 200
@@ -162,15 +164,14 @@ class DiscordBot(commands.Bot):
             await self.send_changelog(channel_id, file)
             return jsonify({"status": "Message sent"}), 200
 
-    async def send_message(self, name, url, thumb, local_version_list, download_short_list, author_info, number_show, changelog_show, channel_id, s3_object_url=None):
+    async def send_message(self, name, url, thumb, local_version_list, download_short_list, author_info, number_show, changelog_show, channel_id, s3_object_url=None, summary=None):
         if local_version_list:
             description = "# 업데이트 발견!"
         else:
             description = "# 새 아이템 등록!"
 
-        if changelog_show:
-            if s3_object_url:
-                description = f'{description} \n ## [변경사항 보기]({s3_object_url})'
+        if changelog_show and s3_object_url:
+            description = f'{description} \n ## [변경사항 보기]({s3_object_url})'
 
         if author_info is not None:
             author_icon = author_info[0]
@@ -192,6 +193,8 @@ class DiscordBot(commands.Bot):
             if local_version_list:
                 embed.add_field(name="LOCAL", value=str(local_version_list), inline=True)
             embed.add_field(name="BOOTH", value=str(download_short_list), inline=True)
+        if summary: 
+            embed.add_field(name="요약", value=str(summary), inline=False)
         embed.set_footer(text="BOOTH.pm", icon_url="https://booth.pm/static-images/pwa/icon_size_128.png")
 
         channel = self.get_channel(int(channel_id))

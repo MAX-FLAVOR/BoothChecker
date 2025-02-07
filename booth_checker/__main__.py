@@ -17,6 +17,7 @@ from shared import *
 import booth
 import booth_sqlite
 import cloudflare
+import chatgpt
 
 # mark_as
 #   - 0: Nothing
@@ -165,6 +166,8 @@ def init_update_check(item):
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
 
+        summary = chatgpt.chat(files_list(tree))
+
         if s3:
             html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
             try:
@@ -199,7 +202,8 @@ def init_update_check(item):
         'number_show': number_show,
         'changelog_show': changelog_show,
         'channel_id': discord_channel_id,
-        's3_object_url': s3_object_url
+        's3_object_url': s3_object_url,
+        'summary': summary,
     }
 
     response = requests.post(api_url, json=data)
@@ -515,6 +519,32 @@ def tree_to_html(tree):
     html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
     return html
 
+def files_list(tree):
+    raw_data = ''
+
+    for key, subtree in tree.items():
+        if key == '_status':
+            continue  # 상태 정보는 별도로 처리
+        status = subtree.get('_status', 0)
+
+        # 상태 문자열 추가
+        status_str = ''
+        if status == 1:
+            status_str = ' (Added)'
+        elif status == 2:
+            status_str = ' (Deleted)'
+        elif status == 3:
+            status_str = ' (Changed)'
+
+        child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
+
+        if child_subtree:
+            raw_data += f'{key}{status_str}\n'
+            raw_data += f'{files_list(child_subtree)}\n'
+        else:
+            raw_data += f'{key}{status_str}\n'
+
+    return raw_data
 
 def send_error_message(discord_channel_id, discord_user_id, item_number):
     api_url = f'{discord_api_url}/send_error_message'
@@ -565,6 +595,8 @@ if __name__ == "__main__":
     createFolder("./process")
 
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
+
+    chatgpt = chatgpt.openai_api()
 
     # booth_discord 컨테이너 시작 대기
     sleep(15)
