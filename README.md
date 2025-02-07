@@ -15,6 +15,8 @@ services:
       - ./config.json:/root/boothchecker/config.json
     depends_on:
       - booth-discord
+    environment:
+      - OPENAI_API_KEY="YOUR_OPENAI_API_KEY" #Optional
     restart: unless-stopped
     logging:
       driver: "json-file"
