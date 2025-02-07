@@ -58,7 +58,7 @@ def init_update_check(item):
         item_url = download_url_list[1][0][1]
     except:
         logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id, item_number)
+        send_error_message(discord_channel_id, discord_user_id, item_number, order_num)
         raise Exception(f'[{item_number}-download_url_list] : {download_url_list}')
 
     if name is None:
@@ -90,6 +90,7 @@ def init_update_check(item):
     if (length_hint(local_list) == length_hint(download_short_list)
         and ((length_hint(local_list) == 0 and length_hint(download_short_list) == 0)
             or (local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]))):
+        logger.info(f'[{order_num}] nothing has changed')
         return
              
     if (length_hint(download_short_list) == 0):
@@ -104,164 +105,6 @@ def init_update_check(item):
     # give 'marked_as' = 2 on all elements
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
-    
-    
-    def build_tree(paths):
-        tree = {}
-        path_stack = []
-        for item in paths:
-            line_str = item.get('line_str', '')
-            status = item.get('status', 0)
-
-            # 후행 공백만 제거하여 선행 공백을 보존
-            line_str = line_str.rstrip()
-
-            # 선행 공백의 수를 계산하여 들여쓰기 수준 결정
-            indent_match = re.match(r'^(\s*)(.*)', line_str)
-            if indent_match:
-                leading_spaces = indent_match.group(1)
-                indent = len(leading_spaces)
-                content = indent_match.group(2)
-            else:
-                indent = 0
-                content = line_str
-
-            # content에서 상태 문자열 제거
-            content = re.sub(r'\s*\(.*\)$', '', content)
-
-            # 깊이 계산 (들여쓰기 수준에 따라)
-            depth = indent // 4  # 공백 4칸당 한 레벨로 설정 (필요에 따라 조정)
-
-            # 현재 깊이에 맞게 경로 스택 조정
-            path_stack = path_stack[:depth]
-            path_stack.append(content)
-
-            # 트리 빌드
-            node = tree
-            for part in path_stack[:-1]:
-                node = node.setdefault(part, {})
-            # 현재 노드에 상태 정보 저장
-            current_node = node.setdefault(path_stack[-1], {})
-            current_node['_status'] = status
-        return tree
-
-    def tree_to_html(tree):
-        html = '<ul>\n'  # 시작 태그에 줄바꿈 추가
-        for key, subtree in tree.items():
-            if key == '_status':
-                continue  # 상태 정보는 별도로 처리
-            status = subtree.get('_status', 0)
-
-            # 상태에 따른 컬러 지정
-            line_color = 'rgb(255, 255, 255)'  # 기본 색상 (흰색)
-            if status == 1:
-                line_color = 'rgb(125, 164, 68)'  # Added (녹색 계열)
-            elif status == 2:
-                line_color = 'rgb(252, 101, 89)'  # Deleted (빨간색 계열)
-            elif status == 3:
-                line_color = 'rgb(128, 161, 209)'  # Changed (파란색 계열)
-
-            # 상태 문자열 추가
-            status_str = ''
-            if status == 1:
-                status_str = ' (Added)'
-            elif status == 2:
-                status_str = ' (Deleted)'
-            elif status == 3:
-                status_str = ' (Changed)'
-
-            # '_status' 키를 제외한 나머지로 재귀 호출
-            child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
-
-            if child_subtree:
-                # 자식이 있는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span>\n'
-                html += tree_to_html(child_subtree)
-                html += '</li>\n'
-            else:
-                # 자식이 없는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>\n'
-        html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
-        return html
-
-
-    def build_tree(paths):
-        tree = {}
-        path_stack = []
-        for item in paths:
-            line_str = item.get('line_str', '')
-            status = item.get('status', 0)
-
-            # 후행 공백만 제거하여 선행 공백을 보존
-            line_str = line_str.rstrip()
-
-            # 선행 공백의 수를 계산하여 들여쓰기 수준 결정
-            indent_match = re.match(r'^(\s*)(.*)', line_str)
-            if indent_match:
-                leading_spaces = indent_match.group(1)
-                indent = len(leading_spaces)
-                content = indent_match.group(2)
-            else:
-                indent = 0
-                content = line_str
-
-            # content에서 상태 문자열 제거
-            content = re.sub(r'\s*\(.*\)$', '', content)
-
-            # 깊이 계산 (들여쓰기 수준에 따라)
-            depth = indent // 4  # 공백 4칸당 한 레벨로 설정 (필요에 따라 조정)
-
-            # 현재 깊이에 맞게 경로 스택 조정
-            path_stack = path_stack[:depth]
-            path_stack.append(content)
-
-            # 트리 빌드
-            node = tree
-            for part in path_stack[:-1]:
-                node = node.setdefault(part, {})
-            # 현재 노드에 상태 정보 저장
-            current_node = node.setdefault(path_stack[-1], {})
-            current_node['_status'] = status
-        return tree
-
-    def tree_to_html(tree):
-        html = '<ul>\n'  # 시작 태그에 줄바꿈 추가
-        for key, subtree in tree.items():
-            if key == '_status':
-                continue  # 상태 정보는 별도로 처리
-            status = subtree.get('_status', 0)
-
-            # 상태에 따른 컬러 지정
-            line_color = 'rgb(255, 255, 255)'  # 기본 색상 (흰색)
-            if status == 1:
-                line_color = 'rgb(125, 164, 68)'  # Added (녹색 계열)
-            elif status == 2:
-                line_color = 'rgb(252, 101, 89)'  # Deleted (빨간색 계열)
-            elif status == 3:
-                line_color = 'rgb(128, 161, 209)'  # Changed (파란색 계열)
-
-            # 상태 문자열 추가
-            status_str = ''
-            if status == 1:
-                status_str = ' (Added)'
-            elif status == 2:
-                status_str = ' (Deleted)'
-            elif status == 3:
-                status_str = ' (Changed)'
-
-            # '_status' 키를 제외한 나머지로 재귀 호출
-            child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
-
-            if child_subtree:
-                # 자식이 있는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span>\n'
-                html += tree_to_html(child_subtree)
-                html += '</li>\n'
-            else:
-                # 자식이 없는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>\n'
-        html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
-        return html
 
     archive_folder = f'./archive/{strftime_now()}'
 
@@ -362,9 +205,9 @@ def init_update_check(item):
     response = requests.post(api_url, json=data)
 
     if response.status_code == 200:
-        logger.info('send_message API 요청 성공')
+        logger.info(f'[{order_num}] send_message API 요청 성공')
     else:
-        logger.error(f'send_message API 요청 실패: {response.text}')
+        logger.error(f'[{order_num}] send_message API 요청 실패: {response.text}')
     
     if changelog_show is True:
         if not s3:
@@ -375,9 +218,9 @@ def init_update_check(item):
             }
             response = requests.post(api_url, json=data)
             if response.status_code == 200:
-                logger.info('send_changelog API 요청 성공')
+                logger.info(f'[{order_num}] send_changelog API 요청 성공')
             else:
-                logger.error(f'send_changelog API 요청 실패: {response.text}')
+                logger.error(f'[{order_num}] send_changelog API 요청 실패: {response.text}')
             os.remove(changelog_html_path)
     
     # delete all of 'marked_as'
@@ -685,9 +528,9 @@ def send_error_message(discord_channel_id, discord_user_id, item_number):
     response = requests.post(api_url, json=data)
 
     if response.status_code == 200:
-        logger.info('booth_discord API 요청 성공')
+        logger.info(f'[{order_num}] send_error_message API 요청 성공')
     else:
-        logger.error(f'booth_discord API 요청 실패: {response.text}')
+        logger.error(f'[{order_num}] send_error_message API 요청 실패: {response.text}')
     return
 
 if __name__ == "__main__":
@@ -734,9 +577,11 @@ if __name__ == "__main__":
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")
+        shutil.rmtree("./changelog")
 
         createFolder("./download")
         createFolder("./process")
+        createFolder("./changelog")
         
         current_time = strftime_now()
         
