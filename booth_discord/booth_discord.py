@@ -125,6 +125,7 @@ class DiscordBot(commands.Bot):
             name = data.get("name")
             url = data.get("url")
             thumb = data.get("thumb")
+            item_number = data.get("item_number")
             local_version_list = data.get("local_version_list")
             download_short_list = data.get("download_short_list")
             author_info = data.get("author_info")
@@ -138,6 +139,7 @@ class DiscordBot(commands.Bot):
                 name,
                 url,
                 thumb,
+                item_number,
                 local_version_list,
                 download_short_list,
                 author_info,
@@ -167,7 +169,7 @@ class DiscordBot(commands.Bot):
             await self.send_changelog(channel_id, file)
             return jsonify({"status": "Message sent"}), 200
 
-    async def send_message(self, name, url, thumb, local_version_list, download_short_list, author_info, number_show, changelog_show, channel_id, s3_object_url=None, summary=None):
+    async def send_message(self, name, url, thumb, item_number, local_version_list, download_short_list, author_info, number_show, changelog_show, channel_id, s3_object_url=None, summary=None):
         if local_version_list:
             description = "# 업데이트 발견!"
         else:
@@ -192,6 +194,7 @@ class DiscordBot(commands.Bot):
         )
         embed.set_author(name=author_name, icon_url=author_icon)
         embed.set_thumbnail(url=thumb)
+        embed.add_field(name="아이템 번호", value=str(item_number), inline=False)
         if number_show:
             if local_version_list:
                 embed.add_field(name="LOCAL", value=str(local_version_list), inline=True)

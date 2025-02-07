@@ -167,7 +167,9 @@ def init_update_check(item):
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
         if summary_this and os.getenv('OPENAI_API_KEY'):
-            summary = chatgpt.chat(files_list(tree))
+            summary = f"{chatgpt.chat(files_list(tree))}\n\n이 요약은 AI로 자동 생성되었습니다. 부정확하거나 누락된 정보가 있을 수 있습니다."
+        else:
+            summary = None
 
         if s3:
             html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
@@ -197,6 +199,7 @@ def init_update_check(item):
         'name': name,
         'url': url,
         'thumb': thumb,
+        'item_number': item_number,
         'local_version_list': local_list,
         'download_short_list': download_short_list,
         'author_info': author_info,
