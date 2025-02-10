@@ -172,7 +172,7 @@ def init_update_check(item):
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
         if summary_this and os.getenv('OPENAI_API_KEY'):
-            summary = f"{chatgpt.chat(files_list(tree))}\n\n이 요약은 AI로 자동 생성되었습니다. 부정확하거나 누락된 정보가 있을 수 있습니다."
+            summary = f"{chatgpt.chat(files_list(tree))}"
         else:
             summary = None
 
