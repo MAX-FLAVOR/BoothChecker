@@ -88,6 +88,7 @@ def init_update_check(item):
         version_json = simdjson.load(file)
     
     local_list = version_json['short-list'] 
+    local_list_name = version_json['name-list']
 
     if (length_hint(local_list) == length_hint(download_short_list)
         and ((length_hint(local_list) == 0 and length_hint(download_short_list) == 0)
@@ -110,10 +111,14 @@ def init_update_check(item):
 
     archive_folder = f'./archive/{strftime_now()}'
 
+    item_name_list = []
+
     # 먼저 다운로드 및 아카이브 처리
     for item in download_url_list: 
         # download stuff
         download_path = f'./download/{item[1]}'
+
+        item_name_list.append(item[1])
         
         if changelog_show is True or archive_this is True:
             logger.info(f'[{order_num}] downloading {item[0]} to {download_path}')
@@ -195,13 +200,16 @@ def init_update_check(item):
 
     api_url = f'{discord_api_url}/send_message'
 
+    local_list_name = '\n'.join(local_list_name)
+    booth_list_name = '\n'.join(item_name_list)
+
     data = {
         'name': name,
         'url': url,
         'thumb': thumb,
         'item_number': item_number,
-        'local_version_list': local_list,
-        'download_short_list': download_short_list,
+        'local_version_list': local_list_name,
+        'download_short_list': booth_list_name,
         'author_info': author_info,
         'number_show': number_show,
         'changelog_show': changelog_show,
@@ -239,7 +247,8 @@ def init_update_check(item):
     for [previous, root_name] in delete_keys:
         process_delete_keys(previous, root_name)
     delete_keys = []
-    
+
+    version_json['name-list'] = item_name_list
     version_json['short-list'] = download_short_list
     
     file.seek(0)
@@ -604,7 +613,7 @@ if __name__ == "__main__":
         chatgpt = chatgpt.openai_api()
 
     # booth_discord 컨테이너 시작 대기
-    sleep(15)
+    # sleep(15)
 
     while True:
         logger.info("BoothChecker started")

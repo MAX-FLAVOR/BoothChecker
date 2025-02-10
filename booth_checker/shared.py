@@ -4,7 +4,7 @@ import simdjson
 def createVersionFile(version_file_path):
     f = open(version_file_path, 'w')
     
-    short_list = {'short-list': [], 'files': {}}
+    short_list = {'short-list': [], 'files': {}, 'name-list': []}
     # shortlist = {"short-list": download_url_list, 'files': {}}
     
     # for fileroot in download_url_list:
