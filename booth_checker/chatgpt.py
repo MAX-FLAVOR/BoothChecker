@@ -9,7 +9,7 @@ class openai_api:
 
         system_role = dict()
         system_role["role"] = "developer"
-        system_role["content"] = """너는 체인지 로그 요약 전문가야. 내가 줄 체인지 로그 내용을 핵심만 간결하게 한국어로 요약해. 그리고 제목 마크다운은 사용하면 안돼"""
+        system_role["content"] = """너는 체인지 로그 요약 전문가야. 내가 줄 체인지 로그 내용은 Added, Deleted, Changed로 구별되어있어 각 파일마다 "-" 붙쳐서 한국어로 요약해. 그리고 제목 마크다운은 사용하면 안돼"""
 
         user_role = dict()
         user_role["role"] = "user"

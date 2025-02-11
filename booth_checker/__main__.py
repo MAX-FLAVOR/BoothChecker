@@ -171,8 +171,9 @@ def init_update_check(item):
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
+        summary_data = files_list(tree)
         if summary_this and os.getenv('OPENAI_API_KEY'):
-            summary = f"{chatgpt.chat(files_list(tree))}"
+            summary = f"{chatgpt.chat(summary_data)}"
         else:
             summary = None
 
@@ -539,23 +540,26 @@ def files_list(tree):
         if key == '_status':
             continue  # 상태 정보는 별도로 처리
         status = subtree.get('_status', 0)
-
-        # 상태 문자열 추가
-        status_str = ''
-        if status == 1:
-            status_str = ' (Added)'
-        elif status == 2:
-            status_str = ' (Deleted)'
-        elif status == 3:
-            status_str = ' (Changed)'
-
+        # 자식 노드들 처리
         child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
+        child_data = files_list(child_subtree) if child_subtree else ''
 
-        if child_subtree:
+        if status != 0:
+            # 상태 문자열 결정
+            if status == 1:
+                status_str = ' (Added)'
+            elif status == 2:
+                status_str = ' (Deleted)'
+            elif status == 3:
+                status_str = ' (Changed)'
+            else:
+                status_str = ''
+
             raw_data += f'{key}{status_str}\n'
-            raw_data += f'{files_list(child_subtree)}\n'
+            raw_data += child_data
         else:
-            raw_data += f'{key}{status_str}\n'
+            # 현재 노드의 status가 0이면 출력 안 하고 자식 노드들만 처리
+            raw_data += child_data
 
     return raw_data
 
