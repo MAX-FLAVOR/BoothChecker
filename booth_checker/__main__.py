@@ -167,26 +167,28 @@ def init_update_check(item):
         }
         output = changelog_html.render(data)
 
-        changelog_html_path = "changelog/changelog.html"
+        changelog_filename = uuid.uuid4()
+
+        changelog_html_path = f"changelog/{changelog_filename}.html"
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
         summary_data = files_list(tree)
         if summary_this and os.getenv('OPENAI_API_KEY'):
+            logger.info(f'[{order_num}] Generating summary')
             summary = f"{chatgpt.chat(summary_data)}"
         else:
             summary = None
 
         if s3:
-            html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
             try:
                 cloudflare.s3_init(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
-                cloudflare.s3_upload(changelog_html_path, s3['bucket_name'], f'changelog/{html_upload_name}.html')
+                cloudflare.s3_upload(changelog_html_path, s3['bucket_name'], changelog_html_path)
                 logger.info(f'[{order_num}] Changelog uploaded to S3')
             except Exception as e:
                 logger.error(f'[{order_num}] Error occurred while uploading changelog to S3: {e}')
                 s3_object_url = None
-            s3_object_url = f'https://{s3['bucket_access_url']}/changelog/{html_upload_name}.html'
+            s3_object_url = f'https://{s3['bucket_access_url']}/{changelog_html_path}'
         else:
             s3_object_url = None
 
@@ -329,35 +331,46 @@ def init_file_process(input_path, filename, version_json, encoding):
         filehash = "DIRECTORY"
         
     process_path = f'./process/{pathstr}'
-    zip_type = 0
     try:
         zip_type = try_extract(input_path, filename, process_path, encoding)
-        
-        json = version_json['files']
-        for entry in range(0, len(json_level) - 1, 1):
-            pre_json = json.get(json_level[entry], None)
-            json = pre_json.get('files', None)
-
-        if json is None:
-            json = pre_json['files'] = {}
-            
-        pre_json = json
-        json = pre_json.get(filename, None)
-        
-        if json is None:
-            pre_json[filename] = {'hash': filehash, 'mark_as': 1}
-        else:
-            pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
-            
-        if zip_type > 0 or os.path.isdir(process_path):
-            for new_filename in os.listdir(process_path):
-                new_process_path = os.path.join(process_path, new_filename)
-                init_file_process(new_process_path, new_filename, version_json, encoding)
-    except Exception as e:
-        raise
-    finally:
+    except:
+        logger.error(f'[{order_num}] error occured on extracting {filename}')
         json_level.pop()
-        end_file_process(zip_type, process_path)
+        end_file_process(0, process_path)
+        return
+    
+    json = version_json['files']
+    for entry in range(0, len(json_level) - 1, 1):
+        pre_json = json.get(json_level[entry], None)
+        json = pre_json.get('files', None)
+
+    if json is None:
+        json = pre_json['files'] = {}
+        
+    pre_json = json
+    json = pre_json.get(filename, None)
+    
+    if json is None:
+        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+    else:
+        pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
+
+    if json is None:
+        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+    else:
+        if pre_json[filename]['hash'] == filehash:
+            pre_json[filename]['mark_as'] = 0
+        else:
+            pre_json[filename]['hash'] = filehash  # 해시값 업데이트 추가
+            pre_json[filename]['mark_as'] = 3
+        
+    if zip_type > 0 or os.path.isdir(process_path):
+        for new_filename in os.listdir(process_path):
+            new_process_path = os.path.join(process_path, new_filename)
+            init_file_process(new_process_path, new_filename, version_json, encoding)
+
+    json_level.pop()
+    end_file_process(zip_type, process_path)
     
         
 def end_file_process(zip_type, process_path):
@@ -617,7 +630,7 @@ if __name__ == "__main__":
         chatgpt = chatgpt.openai_api()
 
     # booth_discord 컨테이너 시작 대기
-    # sleep(15)
+    sleep(15)
 
     while True:
         logger.info("BoothChecker started")
@@ -627,11 +640,9 @@ if __name__ == "__main__":
         # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
         shutil.rmtree("./download")
         shutil.rmtree("./process")
-        shutil.rmtree("./changelog")
 
         createFolder("./download")
         createFolder("./process")
-        createFolder("./changelog")
         
         current_time = strftime_now()
         
