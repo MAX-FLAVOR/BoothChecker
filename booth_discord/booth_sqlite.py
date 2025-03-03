@@ -10,8 +10,7 @@ class BoothSQLite():
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS booth_accounts (
                 session_cookie TEXT UNIQUE,
-                discord_user_id INTEGER PRIMARY KEY,
-                discord_channel_id INTEGER
+                discord_user_id INTEGER PRIMARY KEY
             )
         ''')
 
@@ -30,19 +29,30 @@ class BoothSQLite():
                 FOREIGN KEY(discord_user_id) REFERENCES booth_accounts(discord_user_id)
             )
         ''')
+        
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS discord_noti_channels (
+                discord_channel_id INTEGER,
+                booth_order_number TEXT,
+                discord_user_id INTEGER,
+                FOREIGN KEY(discord_user_id) REFERENCES booth_accounts(discord_user_id),
+                FOREIGN KEY(booth_order_number) REFERENCES booth_items(booth_order_number),
+                PRIMARY KEY (discord_channel_id,booth_order_number) 
+            )
+        ''')
 
     def __del__(self):
         self.conn.close()
     
-    def add_booth_account(self, session_cookie, discord_user_id, discord_channel_id):
+    def add_booth_account(self, session_cookie, discord_user_id):
         self.cursor.execute('''
-            INSERT OR REPLACE INTO booth_accounts (session_cookie, discord_user_id, discord_channel_id)
-            VALUES (?, ?, ?)
-        ''', (session_cookie, discord_user_id, discord_channel_id))
+            INSERT OR IGNORE INTO booth_accounts (session_cookie, discord_user_id)
+            VALUES (?, ?)
+        ''', (session_cookie, discord_user_id))
         self.conn.commit()
         return self.cursor.lastrowid
     
-    def add_booth_item(self, discord_user_id, booth_item_number, item_name, intent_encoding,summary_this):
+    def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, item_name, intent_encoding,summary_this):
         booth_account = self.get_booth_account(discord_user_id)
         if self.is_item_duplicate(booth_item_number, discord_user_id):
             raise Exception("이미 등록된 아이템입니다.")
@@ -51,7 +61,7 @@ class BoothSQLite():
         if booth_account:
             booth_order_info = get_booth_order_info(booth_item_number, ("_plaza_session_nktz7u", booth_account[0]))
             self.cursor.execute('''
-                INSERT OR REPLACE INTO booth_items (
+                INSERT OR IGNORE INTO booth_items (
                                 booth_order_number,
                                 booth_item_number,
                                 discord_user_id,
@@ -75,6 +85,7 @@ class BoothSQLite():
                   booth_order_info[0],
                   summary_this))
             self.conn.commit()
+            self.add_discord_noti_channel(discord_user_id, discord_channel_id, booth_order_info[1])
             return self.cursor.lastrowid
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
@@ -134,14 +145,30 @@ class BoothSQLite():
             return self.cursor.fetchall()
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
-        
-    def update_discord_channel(self, discord_user_id, discord_channel_id):
+
+    def add_discord_noti_channel(self, discord_user_id, discord_channel_id, booth_order_number):
         booth_account = self.get_booth_account(discord_user_id)
-        if booth_account:
+        booth_item = self.get_booth_item(booth_order_number)
+
+        if booth_account and booth_item:
             self.cursor.execute('''
-                UPDATE booth_accounts SET discord_channel_id = ? WHERE discord_user_id = ?
-            ''', (discord_channel_id, discord_user_id,))
+                INSERT OR IGNORE INTO discord_noti_channels (discord_user_id, discord_channel_id, booth_order_number)
+                VALUES (?, ?, ?)
+            ''', (discord_user_id, discord_channel_id, booth_order_number))
             self.conn.commit()
-            return True
+            return self.cursor.lastrowid
         else:
-            raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
+            if not booth_account:
+                raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
+            elif not booth_item:
+                raise Exception("BOOTH 아이템이 등록되어 있지 않습니다.")
+            
+    def get_booth_item(self, booth_order_number):
+        self.cursor.execute('''
+            SELECT * FROM booth_items
+            WHERE booth_order_number = ?
+        ''', (booth_order_number,))
+        result = self.cursor.fetchone()
+        if result:
+            return result
+        return None
