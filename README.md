@@ -7,14 +7,18 @@
 ### Docker-Compose
 ```
 services:
+services:
   booth-checker:
     image: ogunarmaya/booth-checker:latest
     volumes:
       - ./version:/root/boothchecker/version
       - ./archive:/root/boothchecker/archive
+      - ./changelog:/root/boothchecker/changelog
       - ./config.json:/root/boothchecker/config.json
     depends_on:
       - booth-discord
+    environment:
+      - OPENAI_API_KEY="YOUR_OPENAI_API_KEY" #Optional
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -26,6 +30,7 @@ services:
     image: ogunarmaya/booth-discord:latest
     volumes:
       - ./version:/root/boothchecker/version
+      - ./changelog:/root/boothchecker/changelog
       - ./config.json:/root/boothchecker/config.json
     depends_on:
       - chrome

@@ -18,14 +18,15 @@ class BoothSQLite():
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS booth_items (
                 booth_order_number TEXT PRIMARY KEY,
-                booth_item_name TEXT,
-                booth_item_number INTEGER,
+                booth_item_number TEXT,
+                discord_user_id INTEGER,
+                item_name TEXT,
                 intent_encoding TEXT,
                 download_number_show BOOLEAN,
                 changelog_show BOOLEAN,
                 archive_this BOOLEAN,
                 gift_item BOOLEAN,
-                discord_user_id INTEGER,
+                summary_this BOOLEAN,
                 FOREIGN KEY(discord_user_id) REFERENCES booth_accounts(discord_user_id)
             )
         ''')
@@ -41,7 +42,7 @@ class BoothSQLite():
         self.conn.commit()
         return self.cursor.lastrowid
     
-    def add_booth_item(self, discord_user_id, booth_item_number, booth_item_name, intent_encoding):
+    def add_booth_item(self, discord_user_id, booth_item_number, item_name, intent_encoding,summary_this):
         booth_account = self.get_booth_account(discord_user_id)
         if self.is_item_duplicate(booth_item_number, discord_user_id):
             raise Exception("이미 등록된 아이템입니다.")
@@ -52,24 +53,27 @@ class BoothSQLite():
             self.cursor.execute('''
                 INSERT OR REPLACE INTO booth_items (
                                 booth_order_number,
-                                booth_item_name,
                                 booth_item_number,
+                                discord_user_id,
+                                item_name,
                                 intent_encoding,
                                 download_number_show,
                                 changelog_show,
                                 archive_this,
                                 gift_item,
-                                discord_user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                summary_this
+                                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (booth_order_info[1],
-                  booth_item_name,
                   booth_item_number,
+                  discord_user_id,
+                  item_name,
                   intent_encoding,
                   True,
                   True,
                   False,
                   booth_order_info[0],
-                  discord_user_id))
+                  summary_this))
             self.conn.commit()
             return self.cursor.lastrowid
         else:

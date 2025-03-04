@@ -7,7 +7,7 @@ process/
 version/
 archive/
 config.json
-changelog.html
+changelog
 
 *.code-workspace
 *.png

@@ -44,11 +44,13 @@ class DiscordBot(commands.Bot):
         @app_commands.describe(item_number="BOOTH 상품 번호를 입력 해주세요")
         @app_commands.describe(item_name="아이템 이름을 입력 해주세요")
         @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요 (기본값: shift_jis)")
+        @app_commands.describe(summary_this="업데이트 내용 요약 (기본값: True)")
         async def item_add(
             interaction: discord.Interaction,
             item_number: str,
             item_name: str = None,
-            intent_encoding: str = "shift_jis"
+            intent_encoding: str = "shift_jis",
+            summary_this: bool = True
         ):
             try:
                 await interaction.response.defer(ephemeral=True)
@@ -57,6 +59,7 @@ class DiscordBot(commands.Bot):
                     item_number,
                     item_name,
                     intent_encoding,
+                    summary_this,
                 )
                 self.logger.info(f"User {interaction.user.id} is adding item with item number {item_number}")
                 await interaction.followup.send(f"[{item_number}] 등록 완료", ephemeral=True)
@@ -122,6 +125,7 @@ class DiscordBot(commands.Bot):
             name = data.get("name")
             url = data.get("url")
             thumb = data.get("thumb")
+            item_number = data.get("item_number")
             local_version_list = data.get("local_version_list")
             download_short_list = data.get("download_short_list")
             author_info = data.get("author_info")
@@ -129,18 +133,21 @@ class DiscordBot(commands.Bot):
             changelog_show = data.get("changelog_show")
             channel_id = data.get("channel_id")
             s3_object_url = data.get("s3_object_url")
+            summary = data.get("summary")
 
             await self.send_message(
                 name,
                 url,
                 thumb,
+                item_number,
                 local_version_list,
                 download_short_list,
                 author_info,
                 number_show,
                 changelog_show,
                 channel_id,
-                s3_object_url
+                s3_object_url,
+                summary
             )
 
             return jsonify({"status": "Message sent"}), 200
@@ -162,15 +169,14 @@ class DiscordBot(commands.Bot):
             await self.send_changelog(channel_id, file)
             return jsonify({"status": "Message sent"}), 200
 
-    async def send_message(self, name, url, thumb, local_version_list, download_short_list, author_info, number_show, changelog_show, channel_id, s3_object_url=None):
+    async def send_message(self, name, url, thumb, item_number, local_version_list, download_short_list, author_info, number_show, changelog_show, channel_id, s3_object_url=None, summary=None):
         if local_version_list:
             description = "# 업데이트 발견!"
         else:
             description = "# 새 아이템 등록!"
 
-        if changelog_show:
-            if s3_object_url:
-                description = f'{description} \n ## [변경사항 보기]({s3_object_url})'
+        if changelog_show and s3_object_url:
+            description = f'{description} \n ## [변경사항 보기]({s3_object_url})'
 
         if author_info is not None:
             author_icon = author_info[0]
@@ -188,10 +194,13 @@ class DiscordBot(commands.Bot):
         )
         embed.set_author(name=author_name, icon_url=author_icon)
         embed.set_thumbnail(url=thumb)
+        embed.add_field(name="아이템 번호", value=str(item_number), inline=False)
         if number_show:
             if local_version_list:
                 embed.add_field(name="LOCAL", value=str(local_version_list), inline=True)
             embed.add_field(name="BOOTH", value=str(download_short_list), inline=True)
+        if summary: 
+            embed.add_field(name="요약", value=str(summary), inline=False)
         embed.set_footer(text="BOOTH.pm", icon_url="https://booth.pm/static-images/pwa/icon_size_128.png")
 
         channel = self.get_channel(int(channel_id))

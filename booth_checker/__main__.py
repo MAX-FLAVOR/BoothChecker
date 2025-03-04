@@ -17,6 +17,7 @@ from shared import *
 import booth
 import booth_sqlite
 import cloudflare
+import chatgpt
 
 # mark_as
 #   - 0: Nothing
@@ -31,16 +32,17 @@ import cloudflare
 
 def init_update_check(item):
     order_num = item[0]
-    name = item[1]
-    item_number = str(item[2])
+    item_number = str(item[1])
+    name = item[2]
     encoding = item[3]
     number_show = bool(item[4])
     changelog_show = bool(item[5])
     archive_this = bool(item[6])
     gift_item = bool(item[7])
-    booth_cookie = {"_plaza_session_nktz7u": item[8]}
-    discord_user_id = item[9]
-    discord_channel_id = item[10]
+    summary_this = bool(item[8])
+    booth_cookie = {"_plaza_session_nktz7u": item[9]}
+    discord_user_id = item[10]
+    discord_channel_id = item[11]
 
     download_short_list = list()
     thumblist = list()
@@ -51,14 +53,14 @@ def init_update_check(item):
     
     if download_url_list is None:
         logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id, item_number)
+        send_error_message(discord_channel_id, discord_user_id, item_number, order_num)
     
     try:
         item_name = download_url_list[1][0][0]
         item_url = download_url_list[1][0][1]
     except:
         logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id, item_number)
+        send_error_message(discord_channel_id, discord_user_id, item_number, order_num)
         raise Exception(f'[{item_number}-download_url_list] : {download_url_list}')
 
     if name is None:
@@ -86,10 +88,12 @@ def init_update_check(item):
         version_json = simdjson.load(file)
     
     local_list = version_json['short-list'] 
+    local_list_name = version_json['name-list']
 
     if (length_hint(local_list) == length_hint(download_short_list)
         and ((length_hint(local_list) == 0 and length_hint(download_short_list) == 0)
             or (local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]))):
+        logger.info(f'[{order_num}] nothing has changed')
         return
              
     if (length_hint(download_short_list) == 0):
@@ -104,171 +108,17 @@ def init_update_check(item):
     # give 'marked_as' = 2 on all elements
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
-    
-    
-    def build_tree(paths):
-        tree = {}
-        path_stack = []
-        for item in paths:
-            line_str = item.get('line_str', '')
-            status = item.get('status', 0)
-
-            # 후행 공백만 제거하여 선행 공백을 보존
-            line_str = line_str.rstrip()
-
-            # 선행 공백의 수를 계산하여 들여쓰기 수준 결정
-            indent_match = re.match(r'^(\s*)(.*)', line_str)
-            if indent_match:
-                leading_spaces = indent_match.group(1)
-                indent = len(leading_spaces)
-                content = indent_match.group(2)
-            else:
-                indent = 0
-                content = line_str
-
-            # content에서 상태 문자열 제거
-            content = re.sub(r'\s*\(.*\)$', '', content)
-
-            # 깊이 계산 (들여쓰기 수준에 따라)
-            depth = indent // 4  # 공백 4칸당 한 레벨로 설정 (필요에 따라 조정)
-
-            # 현재 깊이에 맞게 경로 스택 조정
-            path_stack = path_stack[:depth]
-            path_stack.append(content)
-
-            # 트리 빌드
-            node = tree
-            for part in path_stack[:-1]:
-                node = node.setdefault(part, {})
-            # 현재 노드에 상태 정보 저장
-            current_node = node.setdefault(path_stack[-1], {})
-            current_node['_status'] = status
-        return tree
-
-    def tree_to_html(tree):
-        html = '<ul>\n'  # 시작 태그에 줄바꿈 추가
-        for key, subtree in tree.items():
-            if key == '_status':
-                continue  # 상태 정보는 별도로 처리
-            status = subtree.get('_status', 0)
-
-            # 상태에 따른 컬러 지정
-            line_color = 'rgb(255, 255, 255)'  # 기본 색상 (흰색)
-            if status == 1:
-                line_color = 'rgb(125, 164, 68)'  # Added (녹색 계열)
-            elif status == 2:
-                line_color = 'rgb(252, 101, 89)'  # Deleted (빨간색 계열)
-            elif status == 3:
-                line_color = 'rgb(128, 161, 209)'  # Changed (파란색 계열)
-
-            # 상태 문자열 추가
-            status_str = ''
-            if status == 1:
-                status_str = ' (Added)'
-            elif status == 2:
-                status_str = ' (Deleted)'
-            elif status == 3:
-                status_str = ' (Changed)'
-
-            # '_status' 키를 제외한 나머지로 재귀 호출
-            child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
-
-            if child_subtree:
-                # 자식이 있는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span>\n'
-                html += tree_to_html(child_subtree)
-                html += '</li>\n'
-            else:
-                # 자식이 없는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>\n'
-        html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
-        return html
-
-
-    def build_tree(paths):
-        tree = {}
-        path_stack = []
-        for item in paths:
-            line_str = item.get('line_str', '')
-            status = item.get('status', 0)
-
-            # 후행 공백만 제거하여 선행 공백을 보존
-            line_str = line_str.rstrip()
-
-            # 선행 공백의 수를 계산하여 들여쓰기 수준 결정
-            indent_match = re.match(r'^(\s*)(.*)', line_str)
-            if indent_match:
-                leading_spaces = indent_match.group(1)
-                indent = len(leading_spaces)
-                content = indent_match.group(2)
-            else:
-                indent = 0
-                content = line_str
-
-            # content에서 상태 문자열 제거
-            content = re.sub(r'\s*\(.*\)$', '', content)
-
-            # 깊이 계산 (들여쓰기 수준에 따라)
-            depth = indent // 4  # 공백 4칸당 한 레벨로 설정 (필요에 따라 조정)
-
-            # 현재 깊이에 맞게 경로 스택 조정
-            path_stack = path_stack[:depth]
-            path_stack.append(content)
-
-            # 트리 빌드
-            node = tree
-            for part in path_stack[:-1]:
-                node = node.setdefault(part, {})
-            # 현재 노드에 상태 정보 저장
-            current_node = node.setdefault(path_stack[-1], {})
-            current_node['_status'] = status
-        return tree
-
-    def tree_to_html(tree):
-        html = '<ul>\n'  # 시작 태그에 줄바꿈 추가
-        for key, subtree in tree.items():
-            if key == '_status':
-                continue  # 상태 정보는 별도로 처리
-            status = subtree.get('_status', 0)
-
-            # 상태에 따른 컬러 지정
-            line_color = 'rgb(255, 255, 255)'  # 기본 색상 (흰색)
-            if status == 1:
-                line_color = 'rgb(125, 164, 68)'  # Added (녹색 계열)
-            elif status == 2:
-                line_color = 'rgb(252, 101, 89)'  # Deleted (빨간색 계열)
-            elif status == 3:
-                line_color = 'rgb(128, 161, 209)'  # Changed (파란색 계열)
-
-            # 상태 문자열 추가
-            status_str = ''
-            if status == 1:
-                status_str = ' (Added)'
-            elif status == 2:
-                status_str = ' (Deleted)'
-            elif status == 3:
-                status_str = ' (Changed)'
-
-            # '_status' 키를 제외한 나머지로 재귀 호출
-            child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
-
-            if child_subtree:
-                # 자식이 있는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span>\n'
-                html += tree_to_html(child_subtree)
-                html += '</li>\n'
-            else:
-                # 자식이 없는 경우
-                html += f'<li><span style="color:{line_color}">{key}{status_str}</span></li>\n'
-        html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
-        return html
 
     archive_folder = f'./archive/{strftime_now()}'
+
+    item_name_list = []
 
     # 먼저 다운로드 및 아카이브 처리
     for item in download_url_list: 
         # download stuff
         download_path = f'./download/{item[1]}'
+
+        item_name_list.append(item[1])
         
         if changelog_show is True or archive_this is True:
             logger.info(f'[{order_num}] downloading {item[0]} to {download_path}')
@@ -317,21 +167,28 @@ def init_update_check(item):
         }
         output = changelog_html.render(data)
 
-        changelog_html_path = "changelog/changelog.html"
+        changelog_filename = uuid.uuid4()
+
+        changelog_html_path = f"changelog/{changelog_filename}.html"
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
+        summary_data = files_list(tree)
+        if summary_this and os.getenv('OPENAI_API_KEY'):
+            logger.info(f'[{order_num}] Generating summary')
+            summary = f"{chatgpt.chat(summary_data)}"
+        else:
+            summary = None
 
         if s3:
-            html_upload_name = uuid.uuid5(uuid.NAMESPACE_DNS, str(order_num))
             try:
                 cloudflare.s3_init(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
-                cloudflare.s3_upload(changelog_html_path, s3['bucket_name'], f'changelog/{html_upload_name}.html')
+                cloudflare.s3_upload(changelog_html_path, s3['bucket_name'], changelog_html_path)
                 logger.info(f'[{order_num}] Changelog uploaded to S3')
             except Exception as e:
                 logger.error(f'[{order_num}] Error occurred while uploading changelog to S3: {e}')
                 s3_object_url = None
-            s3_object_url = f'https://{s3['bucket_access_url']}/changelog/{html_upload_name}.html'
+            s3_object_url = f'https://{s3['bucket_access_url']}/{changelog_html_path}'
         else:
             s3_object_url = None
 
@@ -346,25 +203,30 @@ def init_update_check(item):
 
     api_url = f'{discord_api_url}/send_message'
 
+    local_list_name = '\n'.join(local_list_name)
+    booth_list_name = '\n'.join(item_name_list)
+
     data = {
         'name': name,
         'url': url,
         'thumb': thumb,
-        'local_version_list': local_list,
-        'download_short_list': download_short_list,
+        'item_number': item_number,
+        'local_version_list': local_list_name,
+        'download_short_list': booth_list_name,
         'author_info': author_info,
         'number_show': number_show,
         'changelog_show': changelog_show,
         'channel_id': discord_channel_id,
-        's3_object_url': s3_object_url
+        's3_object_url': s3_object_url,
+        'summary': summary,
     }
 
     response = requests.post(api_url, json=data)
 
     if response.status_code == 200:
-        logger.info('send_message API 요청 성공')
+        logger.info(f'[{order_num}] send_message API 요청 성공')
     else:
-        logger.error(f'send_message API 요청 실패: {response.text}')
+        logger.error(f'[{order_num}] send_message API 요청 실패: {response.text}')
     
     if changelog_show is True:
         if not s3:
@@ -375,9 +237,9 @@ def init_update_check(item):
             }
             response = requests.post(api_url, json=data)
             if response.status_code == 200:
-                logger.info('send_changelog API 요청 성공')
+                logger.info(f'[{order_num}] send_changelog API 요청 성공')
             else:
-                logger.error(f'send_changelog API 요청 실패: {response.text}')
+                logger.error(f'[{order_num}] send_changelog API 요청 실패: {response.text}')
             os.remove(changelog_html_path)
     
     # delete all of 'marked_as'
@@ -388,7 +250,8 @@ def init_update_check(item):
     for [previous, root_name] in delete_keys:
         process_delete_keys(previous, root_name)
     delete_keys = []
-    
+
+    version_json['name-list'] = item_name_list
     version_json['short-list'] = download_short_list
     
     file.seek(0)
@@ -468,35 +331,46 @@ def init_file_process(input_path, filename, version_json, encoding):
         filehash = "DIRECTORY"
         
     process_path = f'./process/{pathstr}'
-    zip_type = 0
     try:
         zip_type = try_extract(input_path, filename, process_path, encoding)
-        
-        json = version_json['files']
-        for entry in range(0, len(json_level) - 1, 1):
-            pre_json = json.get(json_level[entry], None)
-            json = pre_json.get('files', None)
-
-        if json is None:
-            json = pre_json['files'] = {}
-            
-        pre_json = json
-        json = pre_json.get(filename, None)
-        
-        if json is None:
-            pre_json[filename] = {'hash': filehash, 'mark_as': 1}
-        else:
-            pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
-            
-        if zip_type > 0 or os.path.isdir(process_path):
-            for new_filename in os.listdir(process_path):
-                new_process_path = os.path.join(process_path, new_filename)
-                init_file_process(new_process_path, new_filename, version_json, encoding)
-    except Exception as e:
-        raise
-    finally:
+    except:
+        logger.error(f'[{order_num}] error occured on extracting {filename}')
         json_level.pop()
-        end_file_process(zip_type, process_path)
+        end_file_process(0, process_path)
+        return
+    
+    json = version_json['files']
+    for entry in range(0, len(json_level) - 1, 1):
+        pre_json = json.get(json_level[entry], None)
+        json = pre_json.get('files', None)
+
+    if json is None:
+        json = pre_json['files'] = {}
+        
+    pre_json = json
+    json = pre_json.get(filename, None)
+    
+    if json is None:
+        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+    else:
+        pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
+
+    if json is None:
+        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+    else:
+        if pre_json[filename]['hash'] == filehash:
+            pre_json[filename]['mark_as'] = 0
+        else:
+            pre_json[filename]['hash'] = filehash  # 해시값 업데이트 추가
+            pre_json[filename]['mark_as'] = 3
+        
+    if zip_type > 0 or os.path.isdir(process_path):
+        for new_filename in os.listdir(process_path):
+            new_process_path = os.path.join(process_path, new_filename)
+            init_file_process(new_process_path, new_filename, version_json, encoding)
+
+    json_level.pop()
+    end_file_process(zip_type, process_path)
     
         
 def end_file_process(zip_type, process_path):
@@ -672,8 +546,37 @@ def tree_to_html(tree):
     html += '</ul>\n'  # 마지막 태그에 줄바꿈 추가
     return html
 
+def files_list(tree):
+    raw_data = ''
 
-def send_error_message(discord_channel_id, discord_user_id, item_number):
+    for key, subtree in tree.items():
+        if key == '_status':
+            continue  # 상태 정보는 별도로 처리
+        status = subtree.get('_status', 0)
+        # 자식 노드들 처리
+        child_subtree = {k: v for k, v in subtree.items() if k != '_status'}
+        child_data = files_list(child_subtree) if child_subtree else ''
+
+        if status != 0:
+            # 상태 문자열 결정
+            if status == 1:
+                status_str = ' (Added)'
+            elif status == 2:
+                status_str = ' (Deleted)'
+            elif status == 3:
+                status_str = ' (Changed)'
+            else:
+                status_str = ''
+
+            raw_data += f'{key}{status_str}\n'
+            raw_data += child_data
+        else:
+            # 현재 노드의 status가 0이면 출력 안 하고 자식 노드들만 처리
+            raw_data += child_data
+
+    return raw_data
+
+def send_error_message(discord_channel_id, discord_user_id, item_number, order_num):
     api_url = f'{discord_api_url}/send_error_message'
 
     data = {
@@ -685,9 +588,9 @@ def send_error_message(discord_channel_id, discord_user_id, item_number):
     response = requests.post(api_url, json=data)
 
     if response.status_code == 200:
-        logger.info('booth_discord API 요청 성공')
+        logger.info(f'[{order_num}] send_error_message API 요청 성공')
     else:
-        logger.error(f'booth_discord API 요청 실패: {response.text}')
+        logger.error(f'[{order_num}] send_error_message API 요청 실패: {response.text}')
     return
 
 if __name__ == "__main__":
@@ -722,6 +625,9 @@ if __name__ == "__main__":
     createFolder("./process")
 
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
+
+    if os.getenv('OPENAI_API_KEY'):
+        chatgpt = chatgpt.openai_api()
 
     # booth_discord 컨테이너 시작 대기
     sleep(15)
