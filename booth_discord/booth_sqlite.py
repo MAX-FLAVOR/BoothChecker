@@ -34,8 +34,7 @@ class BoothSQLite():
             CREATE TABLE IF NOT EXISTS discord_noti_channels (
                 discord_channel_id INTEGER,
                 booth_order_number TEXT,
-                FOREIGN KEY(booth_order_number) REFERENCES booth_items(booth_order_number),
-                PRIMARY KEY (discord_channel_id,booth_order_number) 
+                FOREIGN KEY(booth_order_number) REFERENCES booth_items(booth_order_number)
             )
         ''')
 
