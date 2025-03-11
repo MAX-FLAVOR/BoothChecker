@@ -2,7 +2,8 @@ import sqlite3
 from booth import get_booth_order_info
 
 class BoothSQLite():
-    def __init__(self, db):
+    def __init__(self, db, logger):
+        self.logger = logger
         self.conn = sqlite3.connect(db)
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.cursor = self.conn.cursor()
@@ -34,6 +35,7 @@ class BoothSQLite():
             CREATE TABLE IF NOT EXISTS discord_noti_channels (
                 discord_channel_id INTEGER,
                 booth_order_number TEXT,
+                UNIQUE(discord_channel_id, booth_order_number),         
                 FOREIGN KEY(booth_order_number) REFERENCES booth_items(booth_order_number)
             )
         ''')
@@ -113,6 +115,7 @@ class BoothSQLite():
                     raise Exception(f"Item {booth_item_number} not found for user {discord_user_id}")
                 
                 booth_order_number = result[0]
+                self.logger.debug(f"booth_order_number: {booth_order_number}")
 
                 # 2. booth_items 테이블에서 해당 행을 삭제합니다.
                 self.cursor.execute('''
@@ -166,11 +169,12 @@ class BoothSQLite():
         ''', (discord_channel_id, booth_order_number))
         self.conn.commit()
         return self.cursor.lastrowid
-    
+        
     def del_discord_noti_channel(self, booth_order_number):
+        self.logger.debug(f"del_discord_noti_channel - booth_order_number : {booth_order_number}") # 추가된 로그
         self.cursor.execute('''
             DELETE FROM discord_noti_channels WHERE booth_order_number = ?
-        ''', (booth_order_number))
+        ''', (booth_order_number,))
         self.conn.commit()
         return self.cursor.lastrowid
             
