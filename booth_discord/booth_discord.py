@@ -74,7 +74,7 @@ class DiscordBot(commands.Bot):
         @self.tree.command(name="booth_remove", description="BOOTH 계정 등록 해제")
         async def booth_remove(interaction: discord.Interaction):
             try:
-                self.booth_db.remove_booth_account(interaction.user.id)
+                self.booth_db.del_booth_account(interaction.user.id)
                 self.logger.info(f"User {interaction.user.id} is removing BOOTH account")
                 await interaction.response.send_message("BOOTH 계정 삭제 완료", ephemeral=True)
             except Exception as e:
@@ -85,7 +85,7 @@ class DiscordBot(commands.Bot):
         @app_commands.describe(item="BOOTH 상품 번호를 입력해주세요")
         async def item_del(interaction: discord.Interaction, item: str):
             try:
-                self.booth_db.remove_booth_item(interaction.user.id, item)
+                self.booth_db.del_booth_item(interaction.user.id, item)
                 self.logger.info(f"User {interaction.user.id} is removing item with order number {item}")
                 await interaction.response.send_message(f"[{item}] 삭제 완료", ephemeral=True)
             except Exception as e:

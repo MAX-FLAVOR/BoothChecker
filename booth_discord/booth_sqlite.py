@@ -87,7 +87,7 @@ class BoothSQLite():
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
 
-    def remove_booth_account(self, discord_user_id):
+    def del_booth_account(self, discord_user_id):
         try:
             if self.list_booth_items(discord_user_id):
                 raise Exception("BOOTH 아이템이 등록되어 있습니다. 먼저 아이템을 삭제해주세요.")
@@ -99,14 +99,30 @@ class BoothSQLite():
         except Exception as e:
             raise Exception(e)
     
-    def remove_booth_item(self, discord_user_id, booth_item_number):
+    def del_booth_item(self, discord_user_id, booth_item_number):
         booth_account = self.get_booth_account(discord_user_id)
         if booth_account:
             try:
+                # 1. 삭제할 행의 booth_order_number를 먼저 조회합니다.
                 self.cursor.execute('''
-                    DELETE FROM booth_items WHERE booth_item_number = ? AND discord_user_id = ?
+                    SELECT booth_order_number FROM booth_items 
+                    WHERE booth_item_number = ? AND discord_user_id = ?
+                ''', (booth_item_number, discord_user_id))
+                result = self.cursor.fetchone()
+                if not result:
+                    raise Exception(f"Item {booth_item_number} not found for user {discord_user_id}")
+                
+                booth_order_number = result[0]
+
+                # 2. booth_items 테이블에서 해당 행을 삭제합니다.
+                self.cursor.execute('''
+                    DELETE FROM booth_items 
+                    WHERE booth_item_number = ? AND discord_user_id = ?
                 ''', (booth_item_number, discord_user_id))
                 self.conn.commit()
+                
+                # 3. 조회된 booth_order_number를 사용하여 discord_noti_channels 테이블에서도 삭제합니다.
+                self.del_discord_noti_channel(booth_order_number)
                 return self.cursor.lastrowid
             except Exception as e:
                 raise Exception(e)
@@ -148,6 +164,13 @@ class BoothSQLite():
             INSERT OR IGNORE INTO discord_noti_channels (discord_channel_id, booth_order_number)
             VALUES (?, ?)
         ''', (discord_channel_id, booth_order_number))
+        self.conn.commit()
+        return self.cursor.lastrowid
+    
+    def del_discord_noti_channel(self, booth_order_number):
+        self.cursor.execute('''
+            DELETE FROM discord_noti_channels WHERE booth_order_number = ?
+        ''', (booth_order_number))
         self.conn.commit()
         return self.cursor.lastrowid
             
