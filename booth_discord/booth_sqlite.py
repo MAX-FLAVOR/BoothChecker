@@ -82,7 +82,7 @@ class BoothSQLite():
                   booth_order_info[0],
                   summary_this))
             self.conn.commit()
-            self.add_discord_noti_channel(discord_user_id, discord_channel_id, booth_order_info[1])
+            self.add_discord_noti_channel(discord_channel_id, booth_order_info[1])
             return self.cursor.lastrowid
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
