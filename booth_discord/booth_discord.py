@@ -33,7 +33,7 @@ class DiscordBot(commands.Bot):
         @app_commands.describe(cookie="""BOOTH.pm의 "_plaza_session_nktz7u"의 쿠키 값을 입력 해주세요""")
         async def booth(interaction: discord.Interaction, cookie: str):
             try:
-                self.booth_db.add_booth_account(cookie, interaction.user.id, interaction.channel.id)
+                self.booth_db.add_booth_account(cookie, interaction.user.id)
                 self.logger.info(f"User {interaction.user.id} is registering BOOTH account")
                 await interaction.response.send_message("BOOTH 계정 등록 완료", ephemeral=True)
             except Exception as e:
@@ -56,6 +56,7 @@ class DiscordBot(commands.Bot):
                 await interaction.response.defer(ephemeral=True)
                 self.booth_db.add_booth_item(
                     interaction.user.id,
+                    interaction.channel_id,
                     item_number,
                     item_name,
                     intent_encoding,
@@ -107,15 +108,16 @@ class DiscordBot(commands.Bot):
                 await interaction.response.send_message(f"아이템 목록 불러오기 실패: {e}", ephemeral=True)
                 self.logger.error(f"Error occurred while listing BOOTH items: {e}")
 
-        @self.tree.command(name="noti_update", description="업데이트 알림을 받을 채널 설정")
-        async def noti_update(interaction: discord.Interaction):
-            try:
-                self.booth_db.update_discord_channel(interaction.user.id, interaction.channel.id)
-                self.logger.info(f"User {interaction.user.id} is setting update notification channel")
-                await interaction.response.send_message("업데이트 알림 채널 설정 완료", ephemeral=True)
-            except Exception as e:
-                self.logger.error(f"Error occurred while setting update notification channel: {e}")
-                await interaction.response.send_message(f"업데이트 알림 채널 설정 실패: {e}", ephemeral=True)
+        # fix me
+        # @self.tree.command(name="noti_update", description="업데이트 알림을 받을 채널 설정")
+        # async def noti_update(interaction: discord.Interaction):
+        #     try:
+        #         self.booth_db.update_discord_channel(interaction.user.id, interaction.channel.id)
+        #         self.logger.info(f"User {interaction.user.id} is setting update notification channel")
+        #         await interaction.response.send_message("업데이트 알림 채널 설정 완료", ephemeral=True)
+        #     except Exception as e:
+        #         self.logger.error(f"Error occurred while setting update notification channel: {e}")
+        #         await interaction.response.send_message(f"업데이트 알림 채널 설정 실패: {e}", ephemeral=True)
 
     def setup_routes(self):
         @self.app.route("/send_message", methods=["POST"])

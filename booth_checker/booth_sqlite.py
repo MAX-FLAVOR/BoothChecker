@@ -22,9 +22,11 @@ class BoothSQLite():
                     items.summary_this,
                     accounts.session_cookie,
                     accounts.discord_user_id,
-                    accounts.discord_channel_id
+                    channels.discord_channel_id
             FROM booth_items items
             INNER JOIN booth_accounts accounts
-            ON items.discord_user_id = accounts.discord_user_id
+                ON items.discord_user_id = accounts.discord_user_id
+            INNER JOIN discord_noti_channels channels
+                ON items.booth_order_number = channels.booth_order_number
         ''')
         return self.cursor.fetchall()
