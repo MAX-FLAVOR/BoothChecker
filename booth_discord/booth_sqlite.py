@@ -143,22 +143,13 @@ class BoothSQLite():
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
 
-    def add_discord_noti_channel(self, discord_user_id, discord_channel_id, booth_order_number):
-        booth_account = self.get_booth_account(discord_user_id)
-        booth_item = self.get_booth_item(booth_order_number)
-
-        if booth_account and booth_item:
-            self.cursor.execute('''
-                INSERT OR IGNORE INTO discord_noti_channels (discord_user_id, discord_channel_id, booth_order_number)
-                VALUES (?, ?, ?)
-            ''', (discord_user_id, discord_channel_id, booth_order_number))
-            self.conn.commit()
-            return self.cursor.lastrowid
-        else:
-            if not booth_account:
-                raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
-            elif not booth_item:
-                raise Exception("BOOTH 아이템이 등록되어 있지 않습니다.")
+    def add_discord_noti_channel(self, discord_channel_id, booth_order_number):
+        self.cursor.execute('''
+            INSERT OR IGNORE INTO discord_noti_channels (discord_channel_id, booth_order_number)
+            VALUES (?, ?)
+        ''', (discord_channel_id, booth_order_number))
+        self.conn.commit()
+        return self.cursor.lastrowid
             
     def get_booth_item(self, booth_order_number):
         self.cursor.execute('''
