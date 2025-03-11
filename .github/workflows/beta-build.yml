@@ -1,7 +1,7 @@
-name: dev
+name: beta
 
 on:
-  pull_request:
+  push:
     branches:
       - dev
 
@@ -23,7 +23,7 @@ jobs:
         with:
           push: true
           file: ./docker/booth-checker/Dockerfile
-          tags: ogunarmaya/booth-checker:dev
+          tags: ogunarmaya/booth-checker:beta
           cache-from: type=gha
           cache-to: type=gha,mode=max
     
@@ -32,6 +32,6 @@ jobs:
         with:
           push: true
           file: ./docker/booth-discord/Dockerfile
-          tags: ogunarmaya/booth-discord:dev
+          tags: ogunarmaya/booth-discord:beta
           cache-from: type=gha
           cache-to: type=gha,mode=max
