@@ -152,12 +152,17 @@ class BoothSQLite():
             return True
         return False
     
-    def list_booth_items(self, discord_user_id):
+    def list_booth_items(self, discord_user_id, discord_channel_id):
         booth_account = self.get_booth_account(discord_user_id)
         if booth_account:
             self.cursor.execute('''
-                SELECT booth_item_number FROM booth_items WHERE discord_user_id = ?
-            ''', (discord_user_id,))
+                SELECT bi.booth_item_number 
+                FROM booth_items bi
+                JOIN discord_noti_channels dnc 
+                ON bi.booth_order_number = dnc.booth_order_number
+                WHERE bi.discord_user_id = ? 
+                AND dnc.discord_channel_id = ?;
+            ''', (discord_user_id, discord_channel_id))
             return self.cursor.fetchall()
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")

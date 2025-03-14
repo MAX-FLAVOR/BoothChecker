@@ -95,7 +95,7 @@ class DiscordBot(commands.Bot):
         @self.tree.command(name="item_list", description="아이템 목록 확인")
         async def item_list(interaction: discord.Interaction):
             try:
-                items = self.booth_db.list_booth_items(interaction.user.id)
+                items = self.booth_db.list_booth_items(interaction.user.id, interaction.channel_id)
                 if items:
                     items_list = [row[0] for row in items]
                     items_list = '\n'.join([f' - {i}' for i in items_list])
