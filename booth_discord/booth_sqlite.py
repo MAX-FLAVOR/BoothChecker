@@ -91,7 +91,15 @@ class BoothSQLite():
 
     def del_booth_account(self, discord_user_id):
         try:
-            if self.list_booth_items(discord_user_id):
+            self.cursor.execute('''
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM booth_items 
+                    WHERE discord_user_id = ?
+                );
+            ''', (discord_user_id,))
+            result = self.cursor.fetchone()
+            if result[0] == 1:
                 raise Exception("BOOTH 아이템이 등록되어 있습니다. 먼저 아이템을 삭제해주세요.")
             self.cursor.execute('''
                 DELETE FROM booth_accounts WHERE discord_user_id = ?
