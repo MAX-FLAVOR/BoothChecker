@@ -17,7 +17,7 @@ from shared import *
 import booth
 import booth_sqlite
 import cloudflare
-import chatgpt
+import llm_summary
 
 # mark_as
 #   - 0: Nothing
@@ -174,11 +174,12 @@ def init_update_check(item):
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
         summary_data = files_list(tree)
-        if summary_this and os.getenv('OPENAI_API_KEY'):
+        if summary_this and gemini_api_key:
             logger.info(f'[{order_num}] Generating summary')
-            summary = f"{chatgpt.chat(summary_data)}"
+            summary_result = f"{summary.chat(summary_data)}"
+            logger.debug(summary_result)
         else:
-            summary = None
+            summary_result = None
 
         if s3:
             try:
@@ -218,7 +219,7 @@ def init_update_check(item):
         'changelog_show': changelog_show,
         'channel_id': discord_channel_id,
         's3_object_url': s3_object_url,
-        'summary': summary,
+        'summary': summary_result,
     }
 
     response = requests.post(api_url, json=data)
@@ -610,6 +611,7 @@ if __name__ == "__main__":
     with open("config.json") as file:
         config_json = simdjson.load(file)
     discord_api_url = config_json['discord_api_url']
+    gemini_api_key = config_json['gemini_api_key']
     refresh_interval = int(config_json['refresh_interval'])
     try:
         s3 = config_json['s3']
@@ -626,8 +628,8 @@ if __name__ == "__main__":
 
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
 
-    if os.getenv('OPENAI_API_KEY'):
-        chatgpt = chatgpt.openai_api()
+    if gemini_api_key:
+        summary = llm_summary.google_gemini_api(gemini_api_key)
 
     # booth_discord 컨테이너 시작 대기
     sleep(15)
