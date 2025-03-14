@@ -182,7 +182,7 @@ class BoothSQLite():
         ''', (discord_channel_id, booth_order_number))
         self.conn.commit()
         return self.cursor.lastrowid
-        
+
     def del_discord_noti_channel(self, booth_order_number):
         self.logger.debug(f"del_discord_noti_channel - booth_order_number : {booth_order_number}") # 추가된 로그
         self.cursor.execute('''
@@ -190,13 +190,25 @@ class BoothSQLite():
         ''', (booth_order_number,))
         self.conn.commit()
         return self.cursor.lastrowid
-            
-    def get_booth_item(self, booth_order_number):
+
+    def update_discord_noti_channel(self, discord_user_id, discord_channel_id, booth_item_number):
+        booth_order_number = self.get_booth_order_number(booth_item_number, discord_user_id)
+        if not booth_order_number:
+            raise Exception("Item not found")
         self.cursor.execute('''
-            SELECT * FROM booth_items
+            UPDATE discord_noti_channels
+            SET discord_channel_id = ?
             WHERE booth_order_number = ?
-        ''', (booth_order_number,))
+        ''', (discord_channel_id, booth_order_number))
+        self.conn.commit()
+        return self.cursor.lastrowid
+
+    def get_booth_order_number(self, booth_item_number, discord_user_id):
+        self.cursor.execute('''
+            SELECT booth_order_number FROM booth_items
+            WHERE booth_item_number = ? AND discord_user_id = ?
+        ''', (booth_item_number, discord_user_id))
         result = self.cursor.fetchone()
         if result:
-            return result
+            return result[0]
         return None

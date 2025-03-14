@@ -108,16 +108,16 @@ class DiscordBot(commands.Bot):
                 await interaction.response.send_message(f"아이템 목록 불러오기 실패: {e}", ephemeral=True)
                 self.logger.error(f"Error occurred while listing BOOTH items: {e}")
 
-        # fix me
-        # @self.tree.command(name="noti_update", description="업데이트 알림을 받을 채널 설정")
-        # async def noti_update(interaction: discord.Interaction):
-        #     try:
-        #         self.booth_db.update_discord_channel(interaction.user.id, interaction.channel.id)
-        #         self.logger.info(f"User {interaction.user.id} is setting update notification channel")
-        #         await interaction.response.send_message("업데이트 알림 채널 설정 완료", ephemeral=True)
-        #     except Exception as e:
-        #         self.logger.error(f"Error occurred while setting update notification channel: {e}")
-        #         await interaction.response.send_message(f"업데이트 알림 채널 설정 실패: {e}", ephemeral=True)
+        @self.tree.command(name="noti_update", description="업데이트 알림을 받을 채널 설정")
+        @app_commands.describe(item_number="이 채널에서 업데이트 알림을 받을 아이템 번호를 입력해주세요")
+        async def noti_update(interaction: discord.Interaction, item_number: str):
+            try:
+                self.booth_db.update_discord_noti_channel(interaction.user.id, interaction.channel.id, item_number)
+                self.logger.info(f"User {interaction.user.id} is setting update notification channel")
+                await interaction.response.send_message("업데이트 알림 채널 설정 완료", ephemeral=True)
+            except Exception as e:
+                self.logger.error(f"Error occurred while setting update notification channel: {e}")
+                await interaction.response.send_message(f"업데이트 알림 채널 설정 실패: {e}", ephemeral=True)
 
     def setup_routes(self):
         @self.app.route("/send_message", methods=["POST"])
