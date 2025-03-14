@@ -71,8 +71,8 @@ class DiscordBot(commands.Bot):
                 except discord.errors.NotFound:
                     self.logger.error("Failed to send error response due to invalid interaction.")
 
-        @self.tree.command(name="booth_remove", description="BOOTH 계정 등록 해제")
-        async def booth_remove(interaction: discord.Interaction):
+        @self.tree.command(name="booth_del", description="BOOTH 계정 등록 해제")
+        async def booth_del(interaction: discord.Interaction):
             try:
                 self.booth_db.del_booth_account(interaction.user.id)
                 self.logger.info(f"User {interaction.user.id} is removing BOOTH account")
