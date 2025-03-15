@@ -611,7 +611,11 @@ if __name__ == "__main__":
     with open("config.json") as file:
         config_json = simdjson.load(file)
     discord_api_url = config_json['discord_api_url']
-    gemini_api_key = config_json['gemini_api_key']
+    try:
+        gemini_api_key = config_json['gemini_api_key']
+        summary = llm_summary.google_gemini_api(gemini_api_key)
+    except:
+        logger.info("Gemini API key not found")
     refresh_interval = int(config_json['refresh_interval'])
     try:
         s3 = config_json['s3']
@@ -627,9 +631,6 @@ if __name__ == "__main__":
     createFolder("./process")
 
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
-
-    if gemini_api_key:
-        summary = llm_summary.google_gemini_api(gemini_api_key)
 
     # booth_discord 컨테이너 시작 대기
     sleep(15)
