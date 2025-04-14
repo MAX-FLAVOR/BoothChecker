@@ -17,6 +17,8 @@ class DiscordBot(commands.Bot):
         self.app = Quart(__name__)  # Quart 앱 초기화
         self.setup_commands()
         self.setup_routes()
+        self.error_counts = {}
+        self.error_count_user = set()
         # on_ready 이벤트는 메서드로 정의되므로 별도 등록이 필요 없음
 
     async def setup_hook(self):
@@ -210,12 +212,23 @@ class DiscordBot(commands.Bot):
 
     async def send_error_message(self, channel_id, discord_user_id, item_number):
         channel = self.get_channel(int(channel_id))
-        embed = discord.Embed(
-            title="BOOTH 세션 쿠키 만료됨",
-            description=f"## 아이템 번호 : {item_number}\n/booth 명령어로 쿠키를 재등록해주세요",
-            colour=discord.Color.red()
-        )
-        await channel.send(content=f'<@{discord_user_id}>', embed=embed)
+        
+        key = f'{discord_user_id}_error_count'
+        count = self.error_counts.get(key, 0) + 1
+        self.logger.info(f'{key} = {count}')
+        self.error_counts[key] = count
+
+        if count >= 2 and discord_user_id not in self.error_count_user:
+            self.error_count_user.add(discord_user_id)
+            embed = discord.Embed(
+                title="BOOTH 세션 쿠키 만료됨",
+                description = (
+                    "2회 이상 BOOTH가 응답하지 않았습니다.\n"
+                    "/booth 명령어로 쿠키를 재등록해 주세요."
+                ),
+                colour=discord.Color.red()
+            )
+            await channel.send(content=f'<@{discord_user_id}>', embed=embed)
 
     async def send_changelog(self, channel_id, file):
         channel = self.get_channel(int(channel_id))

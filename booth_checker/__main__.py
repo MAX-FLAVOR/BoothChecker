@@ -53,14 +53,14 @@ def init_update_check(item):
     
     if download_url_list is None:
         logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id, item_number, order_num)
+        send_error_message(discord_channel_id, discord_user_id)
     
     try:
         item_name = download_url_list[1][0][0]
         item_url = download_url_list[1][0][1]
     except:
         logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id, item_number, order_num)
+        send_error_message(discord_channel_id, discord_user_id)
         raise Exception(f'[{item_number}-download_url_list] : {download_url_list}')
 
     if name is None:
@@ -577,13 +577,12 @@ def files_list(tree):
 
     return raw_data
 
-def send_error_message(discord_channel_id, discord_user_id, item_number, order_num):
+def send_error_message(discord_channel_id, discord_user_id):
     api_url = f'{discord_api_url}/send_error_message'
 
     data = {
         'channel_id': discord_channel_id,
-        'user_id': discord_user_id,
-        'item_number':  item_number
+        'user_id': discord_user_id
     }
 
     response = requests.post(api_url, json=data)
