@@ -2,6 +2,7 @@
     "refresh_interval": 600,
     "discord_api_url": "http://booth-discord:5000",
     "discord_bot_token": "",
+    "gemini_api_key": "",
     "s3":
         {
             "endpoint_url": "",

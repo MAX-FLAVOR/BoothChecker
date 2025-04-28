@@ -17,6 +17,8 @@ class DiscordBot(commands.Bot):
         self.app = Quart(__name__)  # Quart 앱 초기화
         self.setup_commands()
         self.setup_routes()
+        self.error_counts = {}
+        self.error_count_user = set()
         # on_ready 이벤트는 메서드로 정의되므로 별도 등록이 필요 없음
 
     async def setup_hook(self):
@@ -33,7 +35,7 @@ class DiscordBot(commands.Bot):
         @app_commands.describe(cookie="""BOOTH.pm의 "_plaza_session_nktz7u"의 쿠키 값을 입력 해주세요""")
         async def booth(interaction: discord.Interaction, cookie: str):
             try:
-                self.booth_db.add_booth_account(cookie, interaction.user.id, interaction.channel.id)
+                self.booth_db.add_booth_account(cookie, interaction.user.id)
                 self.logger.info(f"User {interaction.user.id} is registering BOOTH account")
                 await interaction.response.send_message("BOOTH 계정 등록 완료", ephemeral=True)
             except Exception as e:
@@ -56,6 +58,7 @@ class DiscordBot(commands.Bot):
                 await interaction.response.defer(ephemeral=True)
                 self.booth_db.add_booth_item(
                     interaction.user.id,
+                    interaction.channel_id,
                     item_number,
                     item_name,
                     intent_encoding,
@@ -70,10 +73,10 @@ class DiscordBot(commands.Bot):
                 except discord.errors.NotFound:
                     self.logger.error("Failed to send error response due to invalid interaction.")
 
-        @self.tree.command(name="booth_remove", description="BOOTH 계정 등록 해제")
-        async def booth_remove(interaction: discord.Interaction):
+        @self.tree.command(name="booth_del", description="BOOTH 계정 등록 해제")
+        async def booth_del(interaction: discord.Interaction):
             try:
-                self.booth_db.remove_booth_account(interaction.user.id)
+                self.booth_db.del_booth_account(interaction.user.id)
                 self.logger.info(f"User {interaction.user.id} is removing BOOTH account")
                 await interaction.response.send_message("BOOTH 계정 삭제 완료", ephemeral=True)
             except Exception as e:
@@ -84,7 +87,7 @@ class DiscordBot(commands.Bot):
         @app_commands.describe(item="BOOTH 상품 번호를 입력해주세요")
         async def item_del(interaction: discord.Interaction, item: str):
             try:
-                self.booth_db.remove_booth_item(interaction.user.id, item)
+                self.booth_db.del_booth_item(interaction.user.id, item)
                 self.logger.info(f"User {interaction.user.id} is removing item with order number {item}")
                 await interaction.response.send_message(f"[{item}] 삭제 완료", ephemeral=True)
             except Exception as e:
@@ -94,7 +97,7 @@ class DiscordBot(commands.Bot):
         @self.tree.command(name="item_list", description="아이템 목록 확인")
         async def item_list(interaction: discord.Interaction):
             try:
-                items = self.booth_db.list_booth_items(interaction.user.id)
+                items = self.booth_db.list_booth_items(interaction.user.id, interaction.channel_id)
                 if items:
                     items_list = [row[0] for row in items]
                     items_list = '\n'.join([f' - {i}' for i in items_list])
@@ -108,9 +111,10 @@ class DiscordBot(commands.Bot):
                 self.logger.error(f"Error occurred while listing BOOTH items: {e}")
 
         @self.tree.command(name="noti_update", description="업데이트 알림을 받을 채널 설정")
-        async def noti_update(interaction: discord.Interaction):
+        @app_commands.describe(item_number="이 채널에서 업데이트 알림을 받을 아이템 번호를 입력해주세요")
+        async def noti_update(interaction: discord.Interaction, item_number: str):
             try:
-                self.booth_db.update_discord_channel(interaction.user.id, interaction.channel.id)
+                self.booth_db.update_discord_noti_channel(interaction.user.id, interaction.channel.id, item_number)
                 self.logger.info(f"User {interaction.user.id} is setting update notification channel")
                 await interaction.response.send_message("업데이트 알림 채널 설정 완료", ephemeral=True)
             except Exception as e:
@@ -208,12 +212,23 @@ class DiscordBot(commands.Bot):
 
     async def send_error_message(self, channel_id, discord_user_id, item_number):
         channel = self.get_channel(int(channel_id))
-        embed = discord.Embed(
-            title="BOOTH 세션 쿠키 만료됨",
-            description=f"## 아이템 번호 : {item_number}\n/booth 명령어로 쿠키를 재등록해주세요",
-            colour=discord.Color.red()
-        )
-        await channel.send(content=f'<@{discord_user_id}>', embed=embed)
+        
+        key = f'{discord_user_id}_error_count'
+        count = self.error_counts.get(key, 0) + 1
+        self.logger.info(f'{key} = {count}')
+        self.error_counts[key] = count
+
+        if count >= 2 and discord_user_id not in self.error_count_user:
+            self.error_count_user.add(discord_user_id)
+            embed = discord.Embed(
+                title="BOOTH 세션 쿠키 만료됨",
+                description = (
+                    "2회 이상 BOOTH가 응답하지 않았습니다.\n"
+                    "/booth 명령어로 쿠키를 재등록해 주세요."
+                ),
+                colour=discord.Color.red()
+            )
+            await channel.send(content=f'<@{discord_user_id}>', embed=embed)
 
     async def send_changelog(self, channel_id, file):
         channel = self.get_channel(int(channel_id))

@@ -17,7 +17,7 @@ from shared import *
 import booth
 import booth_sqlite
 import cloudflare
-import chatgpt
+import llm_summary
 
 # mark_as
 #   - 0: Nothing
@@ -53,14 +53,14 @@ def init_update_check(item):
     
     if download_url_list is None:
         logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id, item_number, order_num)
+        send_error_message(discord_channel_id, discord_user_id)
     
     try:
         item_name = download_url_list[1][0][0]
         item_url = download_url_list[1][0][1]
     except:
         logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id, item_number, order_num)
+        send_error_message(discord_channel_id, discord_user_id)
         raise Exception(f'[{item_number}-download_url_list] : {download_url_list}')
 
     if name is None:
@@ -174,11 +174,12 @@ def init_update_check(item):
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
         summary_data = files_list(tree)
-        if summary_this and os.getenv('OPENAI_API_KEY'):
+        if summary_this and gemini_api_key:
             logger.info(f'[{order_num}] Generating summary')
-            summary = f"{chatgpt.chat(summary_data)}"
+            summary_result = f"{summary.chat(summary_data)}"
+            logger.debug(summary_result)
         else:
-            summary = None
+            summary_result = None
 
         if s3:
             try:
@@ -218,7 +219,7 @@ def init_update_check(item):
         'changelog_show': changelog_show,
         'channel_id': discord_channel_id,
         's3_object_url': s3_object_url,
-        'summary': summary,
+        'summary': summary_result,
     }
 
     response = requests.post(api_url, json=data)
@@ -576,13 +577,12 @@ def files_list(tree):
 
     return raw_data
 
-def send_error_message(discord_channel_id, discord_user_id, item_number, order_num):
+def send_error_message(discord_channel_id, discord_user_id):
     api_url = f'{discord_api_url}/send_error_message'
 
     data = {
         'channel_id': discord_channel_id,
-        'user_id': discord_user_id,
-        'item_number':  item_number
+        'user_id': discord_user_id
     }
 
     response = requests.post(api_url, json=data)
@@ -610,6 +610,11 @@ if __name__ == "__main__":
     with open("config.json") as file:
         config_json = simdjson.load(file)
     discord_api_url = config_json['discord_api_url']
+    try:
+        gemini_api_key = config_json['gemini_api_key']
+        summary = llm_summary.google_gemini_api(gemini_api_key)
+    except:
+        logger.info("Gemini API key not found")
     refresh_interval = int(config_json['refresh_interval'])
     try:
         s3 = config_json['s3']
@@ -625,9 +630,6 @@ if __name__ == "__main__":
     createFolder("./process")
 
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
-
-    if os.getenv('OPENAI_API_KEY'):
-        chatgpt = chatgpt.openai_api()
 
     # booth_discord 컨테이너 시작 대기
     sleep(15)
