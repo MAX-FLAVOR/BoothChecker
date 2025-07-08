@@ -212,3 +212,13 @@ class BoothSQLite():
         if result:
             return result[0]
         return None
+    
+    def get_booth_item_count(self, discord_user_id):
+        self.cursor.execute('''
+            SELECT COUNT(*) FROM booth_items
+            WHERE discord_user_id = ?
+        ''', (discord_user_id,))
+        result = self.cursor.fetchone()
+        if result:
+            return result[0]
+        return 0

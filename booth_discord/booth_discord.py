@@ -210,15 +210,18 @@ class DiscordBot(commands.Bot):
         channel = self.get_channel(int(channel_id))
         await channel.send(content="@here", embed=embed)
 
-    async def send_error_message(self, channel_id, discord_user_id, item_number):
+    async def send_error_message(self, channel_id, discord_user_id):
         channel = self.get_channel(int(channel_id))
         
         key = f'{discord_user_id}_error_count'
         count = self.error_counts.get(key, 0) + 1
-        self.logger.info(f'{key} = {count}')
+        self.logger.error(f"BOOTH session cookie expired for user {discord_user_id}. Error count: {count}")
         self.error_counts[key] = count
 
-        if count >= 2 and discord_user_id not in self.error_count_user:
+        booth_item_count = self.booth_db.get_booth_item_count(discord_user_id)
+        booth_item_count = max(booth_item_count, 1)  # Enforce a minimum threshold of 1
+
+        if count >= booth_item_count and discord_user_id not in self.error_count_user:
             self.error_count_user.add(discord_user_id)
             embed = discord.Embed(
                 title="BOOTH 세션 쿠키 만료됨",
