@@ -174,7 +174,7 @@ def init_update_check(item):
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
         summary_data = files_list(tree)
-        if summary_this and gemini_api_key:
+        if summary_this and gemini_api_key and summary_data != None:
             logger.info(f'[{order_num}] Generating summary')
             summary_result = f"{summary.chat(summary_data)}"
             logger.debug(summary_result)
