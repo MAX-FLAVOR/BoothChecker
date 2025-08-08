@@ -31,7 +31,7 @@ def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None
         divs = product_div.select("div.legacy-list-item__center")
         for div in divs:
             download_link = div.select_one("a.nav-reverse")
-            filename_div = div.select_one("div.u-flex-1")
+            filename_div = div.select_one("div.flex-\\[1\\] b")
             
             href = download_link.get("href")
             filename = filename_div.get_text()
