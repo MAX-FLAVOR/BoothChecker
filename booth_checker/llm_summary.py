@@ -14,7 +14,7 @@ class google_gemini_api:
 
     def chat(self, message):
         response = self.client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             config=types.GenerateContentConfig(
                 system_instruction=self.sys_instruct),
             contents=[message]
