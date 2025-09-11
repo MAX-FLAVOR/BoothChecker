@@ -607,7 +607,6 @@ if __name__ == "__main__":
     except:
         s3 = None
 
-
     createFolder("./version")
     createFolder("./version/db")
     createFolder("./version/json")
