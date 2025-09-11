@@ -157,17 +157,18 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
     file_loader = FileSystemLoader('./templates')
     env = Environment(loader=file_loader)
     changelog_html = env.get_template('changelog.html')
-        data = {
-            'html_list_items': html_list_items
-        }
-        output = changelog_html.render(data)
 
-        changelog_filename = uuid.uuid4()
+    data = {
+        'html_list_items': html_list_items
+    }
+    output = changelog_html.render(data)
 
-        changelog_html_path = f"changelog/{changelog_filename}.html"
+    changelog_filename = uuid.uuid4()
 
-        with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
-            html_file.write(output)
+    changelog_html_path = f"changelog/{changelog_filename}.html"
+
+    with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
+        html_file.write(output)
     
     summary_result = None
     summary_data = files_list(tree)
