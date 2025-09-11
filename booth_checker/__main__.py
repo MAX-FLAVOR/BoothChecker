@@ -573,6 +573,12 @@ def send_error_message(discord_channel_id, discord_user_id, order_num):
         logger.error(f'[{order_num}] send_error_message API 요청 실패: {response.text}')
     return
 
+def recreate_folder(path):
+    """Deletes a folder and all its contents, then recreates it."""
+    if os.path.exists(path):
+        shutil.rmtree(path)
+    os.makedirs(path)
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
@@ -626,7 +632,7 @@ if __name__ == "__main__":
             sleep(5)
     else:
         logger.error("Could not connect to booth_discord container. Exiting.")
-        return
+        exit(1)
 
     while True:
         logger.info("BoothChecker cycle started")
@@ -660,9 +666,3 @@ if __name__ == "__main__":
         logger.info("BoothChecker cycle finished")
         logger.info(f"Next check will be at {datetime.now() + timedelta(seconds=refresh_interval)}")
         sleep(refresh_interval)
-
-def recreate_folder(path):
-    """Deletes a folder and all its contents, then recreates it."""
-    if os.path.exists(path):
-        shutil.rmtree(path)
-    os.makedirs(path)
