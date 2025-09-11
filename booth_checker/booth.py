@@ -2,86 +2,94 @@ import requests
 import re
 from bs4 import BeautifulSoup
 
-def crawling(order_num, product_only, cookie, shortlist = None, thumblist = None):
-    url = f'https://accounts.booth.pm/orders/{order_num}'
+def _extract_download_info(div, link_selector, filename_selector):
+    download_link = div.select_one(link_selector)
+    filename_div = div.select_one(filename_selector)
+    
+    if not download_link or not filename_div:
+        return None
+
+    href = download_link.get("href")
+    filename = filename_div.get_text()
+
+    if not href:
+        return None
+
+    href = re.sub(r'[^0-9]', '', href)
+    return [href, filename]
+
+def _crawling_base(url, cookie, selectors, shortlist, thumblist, product_only_filter=None):
     response = requests.get(url=url, cookies=cookie)
     html = response.content
     
-    download_url_list = list()
-    product_info_list = list()
+    download_url_list = []
+    product_info_list = []
     soup = BeautifulSoup(html, "html.parser")
     
-    product_divs = soup.find_all("div", class_="sheet sheet--p400 mobile:pt-[13px] mobile:px-16 mobile:pb-8")
+    product_divs = soup.find_all(selectors['product_div_tag'], class_=selectors['product_div_class'])
+    
     for product_div in product_divs:
-        product_info = product_div.select("a")[1]
-        product_name = product_info.get_text()
-        product_url = product_info.get("href")
-        product_number = re.search(r'/items/(\d+)', product_url).group(1)
-        
-        if product_number not in product_only:
+        if 'product_info_index' in selectors:
+            product_info_elements = product_div.select(selectors['product_info_selector'])
+            if len(product_info_elements) <= selectors['product_info_index']:
+                continue
+            product_info = product_info_elements[selectors['product_info_index']]
+        else:
+            product_info = product_div.select_one(selectors['product_info_selector'])
+
+        if not product_info:
             continue
-        
-        product_info_list.append([product_name, product_url])
-
-        thumb_link = product_div.select_one("img")
-        thumb_url = thumb_link.get("src")
-        if not thumblist is None: 
-            thumblist.append(thumb_url)
-        
-        divs = product_div.select("div.legacy-list-item__center")
-        for div in divs:
-            download_link = div.select_one("a.nav-reverse")
-            filename_div = div.select_one("div.flex-\\[1\\] b")
             
-            href = download_link.get("href")
-            filename = filename_div.get_text()
-
-            href = re.sub(r'[^0-9]', '', href)
-            download_url_list.append([href, filename])
-            
-            if not shortlist is None:
-                shortlist.append(href)
-            
-    return download_url_list, product_info_list
-
-
-def crawling_gift(order_num, cookie, shortlist = None, thumblist = None):
-    url = f'https://booth.pm/gifts/{order_num}'
-    response = requests.get(url=url, cookies=cookie)
-    html = response.content
-    
-    download_url_list = list()
-    product_info_list = list()
-    soup = BeautifulSoup(html, "html.parser")
-    
-    product_divs = soup.find_all("div", class_="rounded-16 bg-white p-40 mobile:px-16 mobile:pt-24 mobile:pb-40 mobile:rounded-none")
-    for product_div in product_divs:
-        product_info = product_div.select_one("div.mt-24.text-left a") 
         product_name = product_info.get_text()
         product_url = product_info.get("href")
+        
+        if product_only_filter:
+            match = re.search(r'/items/(\d+)', product_url)
+            if not match or match.group(1) not in product_only_filter:
+                continue
+        
         product_info_list.append([product_name, product_url])
 
-        thumb_link = product_div.select_one("img")
-        thumb_url = thumb_link.get("src")
-        if not thumblist is None:
-            thumblist.append(thumb_url)
+        thumb_link = product_div.select_one(selectors['thumb_selector'])
+        if thumb_link and thumblist is not None:
+            thumblist.append(thumb_link.get("src"))
         
-        divs = product_div.select("div.w-full.text-left")
-        for div in divs:
-            download_link = div.select_one("a.no-underline.flex.items-center.flex.gap-4")
-            filename_div = div.select_one("div[class='typography-14 !preserve-half-leading']")
-            
-            href = download_link.get("href")
-            filename = filename_div.get_text()
-
-            href = re.sub(r'[^0-9]', '', href)
-            download_url_list.append([href, filename])
-            
-            if not shortlist is None:
-                shortlist.append(href)
+        download_item_divs = product_div.select(selectors['download_item_selector'])
+        for div in download_item_divs:
+            info = _extract_download_info(div, selectors['download_link_selector'], selectors['filename_selector'])
+            if info:
+                download_url_list.append(info)
+                if shortlist is not None:
+                    shortlist.append(info[0])
             
     return download_url_list, product_info_list
 
+def crawling(order_num, product_only, cookie, shortlist=None, thumblist=None):
+    url = f'https://accounts.booth.pm/orders/{order_num}'
+    selectors = {
+        'product_div_tag': 'div',
+        'product_div_class': 'sheet sheet--p400 mobile:pt-[13px] mobile:px-16 mobile:pb-8',
+        'product_info_selector': 'a',
+        'product_info_index': 1,
+        'thumb_selector': 'img',
+        'download_item_selector': 'div.legacy-list-item__center',
+        'download_link_selector': 'a.nav-reverse',
+        'filename_selector': 'div.flex-\\[1\\] b'
+    }
+    return _crawling_base(url, cookie, selectors, shortlist, thumblist, product_only_filter=product_only)
+
+def crawling_gift(order_num, cookie, shortlist=None, thumblist=None):
+    url = f'https://booth.pm/gifts/{order_num}'
+    selectors = {
+        'product_div_tag': 'div',
+        'product_div_class': 'rounded-16 bg-white p-40 mobile:px-16 mobile:pt-24 mobile:pb-40 mobile:rounded-none',
+        'product_info_selector': 'div.mt-24.text-left a',
+        'thumb_selector': 'img',
+        'download_item_selector': 'div.w-full.text-left',
+        'download_link_selector': 'a.no-underline.flex.items-center.flex.gap-4',
+        'filename_selector': "div[class='typography-14 !preserve-half-leading']"
+    }
+    return _crawling_base(url, cookie, selectors, shortlist, thumblist)
 
 def download_item(download_number, filepath, cookie):
     url = f'https://booth.pm/downloadables/{download_number}'

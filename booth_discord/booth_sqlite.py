@@ -1,5 +1,4 @@
 import sqlite3
-from booth import get_booth_order_info
 
 class BoothSQLite():
     def __init__(self, db, logger):
@@ -52,6 +51,9 @@ class BoothSQLite():
         return self.cursor.lastrowid
     
     def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, item_name, intent_encoding,summary_this):
+        # Moved import to be local to avoid dependency issues in booth_checker
+        from booth import get_booth_order_info
+
         booth_account = self.get_booth_account(discord_user_id)
         if self.is_item_duplicate(booth_item_number, discord_user_id):
             raise Exception("이미 등록된 아이템입니다.")
@@ -156,9 +158,7 @@ class BoothSQLite():
             WHERE booth_item_number = ? AND discord_user_id = ?
         ''', (booth_item_number, discord_user_id))
         result = self.cursor.fetchone()
-        if result:
-            return True
-        return False
+        return bool(result)
     
     def list_booth_items(self, discord_user_id, discord_channel_id):
         booth_account = self.get_booth_account(discord_user_id)
@@ -209,16 +209,31 @@ class BoothSQLite():
             WHERE booth_item_number = ? AND discord_user_id = ?
         ''', (booth_item_number, discord_user_id))
         result = self.cursor.fetchone()
-        if result:
-            return result[0]
-        return None
+        return result[0] if result else None
     
     def get_booth_item_count(self, discord_user_id):
-        self.cursor.execute('''
-            SELECT COUNT(*) FROM booth_items
-            WHERE discord_user_id = ?
-        ''', (discord_user_id,))
+        self.cursor.execute('SELECT COUNT(*) FROM booth_items WHERE discord_user_id = ?', (discord_user_id,))
         result = self.cursor.fetchone()
-        if result:
-            return result[0]
-        return 0
+        return result[0] if result else 0
+
+    def get_booth_items(self):
+        self.cursor.execute('''
+            SELECT  items.booth_order_number,
+                    items.booth_item_number,
+                    items.item_name,
+                    items.intent_encoding,
+                    items.download_number_show,
+                    items.changelog_show,
+                    items.archive_this,
+                    items.gift_item,
+                    items.summary_this,
+                    accounts.session_cookie,
+                    accounts.discord_user_id,
+                    channels.discord_channel_id
+            FROM booth_items items
+            INNER JOIN booth_accounts accounts
+                ON items.discord_user_id = accounts.discord_user_id
+            INNER JOIN discord_noti_channels channels
+                ON items.booth_order_number = channels.booth_order_number
+        ''')
+        return self.cursor.fetchall()

@@ -1,6 +1,7 @@
 import shutil
 import zipfile
 import hashlib
+import traceback
 import os
 import requests
 import re
@@ -19,6 +20,10 @@ import booth_sqlite
 import cloudflare
 import llm_summary
 
+class BoothCrawlError(Exception):
+    """Custom exception for BOOTH crawling failures."""
+    pass
+
 # mark_as
 #   - 0: Nothing
 #   - 1: Added
@@ -30,138 +35,128 @@ import llm_summary
 # download_url_list
 #   - [download_number, filename]
 
-def init_update_check(item):
-    order_num = item[0]
-    item_number = str(item[1])
-    name = item[2]
-    encoding = item[3]
-    number_show = bool(item[4])
-    changelog_show = bool(item[5])
-    archive_this = bool(item[6])
-    gift_item = bool(item[7])
-    summary_this = bool(item[8])
-    booth_cookie = {"_plaza_session_nktz7u": item[9]}
-    discord_user_id = item[10]
-    discord_channel_id = item[11]
+def prepare_item_data(item):
+    """Unpacks item data from DB into a dictionary."""
+    return {
+        "order_num": item[0],
+        "item_number": str(item[1]),
+        "name": item[2],
+        "encoding": item[3],
+        "number_show": bool(item[4]),
+        "changelog_show": bool(item[5]),
+        "archive_this": bool(item[6]),
+        "gift_item": bool(item[7]),
+        "summary_this": bool(item[8]),
+        "booth_cookie": {"_plaza_session_nktz7u": item[9]},
+        "discord_user_id": item[10],
+        "discord_channel_id": item[11],
+    }
 
-    download_short_list = list()
-    thumblist = list()
-    if gift_item:
-        download_url_list = booth.crawling_gift(order_num, booth_cookie, download_short_list, thumblist)
+def fetch_booth_data(item_data):
+    """Crawls booth.pm and returns download and product info."""
+    download_short_list = []
+    thumblist = []
+    
+    if item_data["gift_item"]:
+        download_url_list, product_info_list = booth.crawling_gift(
+            item_data["order_num"], item_data["booth_cookie"], download_short_list, thumblist
+        )
     else:
-        download_url_list = booth.crawling(order_num, item_number, booth_cookie, download_short_list, thumblist)
+        download_url_list, product_info_list = booth.crawling(
+            item_data["order_num"], item_data["item_number"], item_data["booth_cookie"], download_short_list, thumblist
+        )
     
-    if download_url_list is None:
-        logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id)
-    
-    try:
-        item_name = download_url_list[1][0][0]
-        item_url = download_url_list[1][0][1]
-    except:
-        logger.error(f'[{item_number}] BOOTH no responding')
-        send_error_message(discord_channel_id, discord_user_id)
-        raise Exception(f'[{item_number}-download_url_list] : {download_url_list}')
+    if not download_url_list or not product_info_list:
+        error_msg = f'[{item_data["item_number"]}] Failed to crawl BOOTH page. The page structure might have changed or the session is invalid.'
+        logger.error(error_msg)
+        send_error_message(item_data["discord_channel_id"], item_data["discord_user_id"], item_data["order_num"])
+        raise BoothCrawlError(error_msg)
 
-    if name is None:
-        name = item_name
-            
-    url = item_url
+    return download_url_list, product_info_list, download_short_list, thumblist
 
-    download_url_list = download_url_list[0]
-
-    version_filename = order_num
-    
-    version_file_path = f'./version/json/{version_filename}.json'
-
+def load_and_compare_version(order_num, download_short_list):
+    """Loads version file and checks for changes. Returns (path, data) or None."""
+    version_file_path = f'./version/json/{order_num}.json'
     if not os.path.exists(version_file_path):
-        logger.info(f'[{order_num}] version file not found')
+        logger.info(f'[{order_num}] version file not found, creating one.')
         createVersionFile(version_file_path)
-        logger.info(f'[{order_num}] version file created')
-    
-    file = open(version_file_path, 'r+')
+
+    def _load_json(path):
+        with open(path, 'r') as f:
+            return simdjson.load(f)
+
     try:
-        version_json = simdjson.load(file)
-    except:
-        logger.warning(f'[{order_num}] version file corrupted')
+        version_json = _load_json(version_file_path)
+    except ValueError:
+        logger.warning(f'[{order_num}] version file corrupted, recreating.')
         createVersionFile(version_file_path)
-        version_json = simdjson.load(file)
-    
-    local_list = version_json['short-list'] 
-    local_list_name = version_json['name-list']
+        version_json = _load_json(version_file_path)
 
-    if (length_hint(local_list) == length_hint(download_short_list)
-        and ((length_hint(local_list) == 0 and length_hint(download_short_list) == 0)
-            or (local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]))):
-        logger.info(f'[{order_num}] nothing has changed')
-        return
-             
-    if (length_hint(download_short_list) == 0):
-        logger.error(f'[{order_num}] BOOTH no responding')
-        return
-    else:
-        logger.info(f'[{order_num}] something has changed')
+    local_list = version_json.get('short-list', [])
     
-    global saved_prehash
-    saved_prehash = {}
-    
-    # give 'marked_as' = 2 on all elements
-    for local_file in version_json['files'].keys():
-        element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
+    has_changed = not (
+        length_hint(local_list) == length_hint(download_short_list) and
+        ((not local_list and not download_short_list) or
+         (local_list and download_short_list and local_list[0] == download_short_list[0] and local_list[-1] == download_short_list[-1]))
+    )
 
+    if not has_changed:
+        logger.info(f'[{order_num}] nothing has changed.')
+        return None
+
+    if not download_short_list:
+        logger.error(f'[{order_num}] BOOTH no responding, but change was detected.')
+        return None
+        
+    logger.info(f'[{order_num}] something has changed.')
+    return version_file_path, version_json
+
+def process_files_for_changelog(item_data, download_url_list, local_list):
+    """Downloads new files and archives them if configured."""
+    item_name_list = []
     archive_folder = f'./archive/{strftime_now()}'
 
-    item_name_list = []
+    for download_number, filename in download_url_list:
+        download_path = f'./download/{filename}'
+        item_name_list.append(filename)
 
-    # 먼저 다운로드 및 아카이브 처리
-    for item in download_url_list: 
-        # download stuff
-        download_path = f'./download/{item[1]}'
+        if item_data["changelog_show"] or item_data["archive_this"]:
+            logger.info(f'[{item_data["order_num"]}] downloading {download_number} to {download_path}')
+            booth.download_item(download_number, download_path, item_data["booth_cookie"])
 
-        item_name_list.append(item[1])
-        
-        if changelog_show is True or archive_this is True:
-            logger.info(f'[{order_num}] downloading {item[0]} to {download_path}')
-            booth.download_item(item[0], download_path, booth_cookie)
-        
-        # archive stuff
-        if archive_this and item[0] not in local_list:
+        if item_data["archive_this"] and download_number not in local_list:
             os.makedirs(archive_folder, exist_ok=True)
-            archive_path = archive_folder + '/' + item[1]
+            archive_path = os.path.join(archive_folder, filename)
             shutil.copyfile(download_path, archive_path)
+    
+    return item_name_list
 
-    # 다운로드 및 아카이브 처리가 끝난 후에 changelog 생성
-    if changelog_show is True:
-        global path_list, current_level, current_count, highest_level
+def generate_changelog_and_summary(item_data, download_url_list, version_json):
+    """Generates changelog, summary, and uploads to S3 if configured."""
+    saved_prehash = {}
+    for local_file in version_json['files'].keys():
+        element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
+        
+    for _, filename in download_url_list:
+        download_path = f'./download/{filename}'
+        logger.info(f'[{item_data["order_num"]}] parsing {filename} structure')
+        try:
+            process_file_tree(download_path, filename, version_json, item_data["encoding"], [], item_data["order_num"])
+        except Exception as e:
+            logger.error(f'[{item_data["order_num"]}] An error occurred while parsing {filename}: {e}')
+            logger.debug(traceback.format_exc())
 
-        html_list_items = ""
-        tree = ""
-
-        for booth_item in download_url_list:  # 각 파일에 대해 처리
-            download_path = f'./download/{booth_item[1]}'
-            logger.info(f'[{order_num}] parsing {booth_item[0]} structure')
-            try:
-                init_file_process(download_path, booth_item[1], version_json, encoding)
-            except Exception as e:
-                logger.error(f'[{order_num}] error occured on parsing {booth_item[0]}\n{e}')
-                continue
-
-            # 초기화
-            path_list = []
-            current_level = 0
-            current_count = 0
-            highest_level = 0
-            init_pathinfo(version_json)
-
-        if not path_list:
-            logger.warning(f'[{order_num}] path_list for {booth_item[0]} is empty. Changelog will not be generated.')
-        else:
-            tree = build_tree(path_list)
-            html_list_items = tree_to_html(tree)  # 각 파일의 트리 구조를 추가
-
-        file_loader = FileSystemLoader('./templates')
-        env = Environment(loader=file_loader)
-        changelog_html = env.get_template('changelog.html')
+    path_list = generate_path_info(version_json, saved_prehash)
+    if not path_list:
+        logger.warning(f'[{item_data["order_num"]}] path_list is empty. Changelog will not be generated.')
+        return None, None, None
+    
+    tree = build_tree(path_list)
+    html_list_items = tree_to_html(tree)
+    
+    file_loader = FileSystemLoader('./templates')
+    env = Environment(loader=file_loader)
+    changelog_html = env.get_template('changelog.html')
         data = {
             'html_list_items': html_list_items
         }
@@ -173,115 +168,126 @@ def init_update_check(item):
 
         with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
             html_file.write(output)
-        summary_data = files_list(tree)
-        if summary_this and gemini_api_key and summary_data != None:
-            logger.info(f'[{order_num}] Generating summary')
-            summary_result = f"{summary.chat(summary_data)}"
-            logger.debug(summary_result)
-        else:
-            summary_result = None
-
-        if s3:
-            try:
-                cloudflare.s3_init(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
-                cloudflare.s3_upload(changelog_html_path, s3['bucket_name'], changelog_html_path)
-                logger.info(f'[{order_num}] Changelog uploaded to S3')
-            except Exception as e:
-                logger.error(f'[{order_num}] Error occurred while uploading changelog to S3: {e}')
-                s3_object_url = None
-            s3_object_url = f'https://{s3['bucket_access_url']}/{changelog_html_path}'
-        else:
-            s3_object_url = None
-
-    # discord author info
-    author_info = booth.crawling_product(url)
     
-    # FIXME: This was not supposed to exist.
-    # But somehow getting error because of this empty thumblist.  
-    thumb = "https://asset.booth.pm/assets/thumbnail_placeholder_f_150x150-73e650fbec3b150090cbda36377f1a3402c01e36ff9fa96158de6016fa067d01.png"
-    if length_hint(thumblist) > 0: 
-        thumb = thumblist[0]
+    summary_result = None
+    summary_data = files_list(tree)
+    if item_data["summary_this"] and gemini_api_key and summary_data:
+        logger.info(f'[{item_data["order_num"]}] Generating summary')
+        summary_result = f"{summary.chat(summary_data)}"
+        logger.debug(summary_result)
+    
+    s3_object_url = None
+    if s3_uploader:
+        try:
+            s3_uploader.upload(changelog_html_path, s3['bucket_name'], changelog_html_path)
+            logger.info(f'[{item_data["order_num"]}] Changelog uploaded to S3')
+            s3_object_url = f"https://{s3['bucket_access_url']}/{changelog_html_path}"
+        except Exception as e:
+            logger.error(f'[{item_data["order_num"]}] Error occurred while uploading changelog to S3: {e}')
 
+    return changelog_html_path, s3_object_url, summary_result
+
+def send_discord_notification(item_data, product_info, thumb, local_list_name, item_name_list, changelog_html_path, s3_object_url, summary_result):
+    """Sends update notification to Discord."""
     api_url = f'{discord_api_url}/send_message'
-
-    local_list_name = '\n'.join(local_list_name)
-    booth_list_name = '\n'.join(item_name_list)
+    product_name, product_url = product_info
+    author_info = booth.crawling_product(product_url)
 
     data = {
-        'name': name,
-        'url': url,
+        'name': item_data["name"] or product_name,
+        'url': product_url,
         'thumb': thumb,
-        'item_number': item_number,
-        'local_version_list': local_list_name,
-        'download_short_list': booth_list_name,
+        'item_number': item_data["item_number"],
+        'local_version_list': '\n'.join(local_list_name or []),
+        'download_short_list': '\n'.join(item_name_list),
         'author_info': author_info,
-        'number_show': number_show,
-        'changelog_show': changelog_show,
-        'channel_id': discord_channel_id,
+        'number_show': item_data["number_show"],
+        'changelog_show': item_data["changelog_show"],
+        'channel_id': item_data["discord_channel_id"],
         's3_object_url': s3_object_url,
         'summary': summary_result,
     }
 
     response = requests.post(api_url, json=data)
-
+    
     if response.status_code == 200:
-        logger.info(f'[{order_num}] send_message API 요청 성공')
+        logger.info(f'[{item_data["order_num"]}] send_message API 요청 성공')
     else:
-        logger.error(f'[{order_num}] send_message API 요청 실패: {response.text}')
+        logger.error(f'[{item_data["order_num"]}] send_message API 요청 실패: {response.text}')
     
-    if changelog_show is True:
-        if not s3:
-            api_url = f'{discord_api_url}/send_changelog'
-            data = {
-                'file': changelog_html_path,
-                'channel_id': discord_channel_id
-            }
-            response = requests.post(api_url, json=data)
-            if response.status_code == 200:
-                logger.info(f'[{order_num}] send_changelog API 요청 성공')
-            else:
-                logger.error(f'[{order_num}] send_changelog API 요청 실패: {response.text}')
-            os.remove(changelog_html_path)
-    
-    # delete all of 'marked_as'
-    global delete_keys
-    for local_file in version_json['files'].keys():
-        remove_element_mark(version_json['files'], version_json['files'][local_file], local_file)
-        
-    for [previous, root_name] in delete_keys:
-        process_delete_keys(previous, root_name)
-    delete_keys = []
+    if item_data["changelog_show"] and changelog_html_path and not s3:
+        api_url = f'{discord_api_url}/send_changelog'
+        data = {'file': changelog_html_path, 'channel_id': item_data["discord_channel_id"]}
+        response = requests.post(api_url, json=data)
+        if response.status_code == 200:
+            logger.info(f'[{item_data["order_num"]}] send_changelog API 요청 성공')
+        else:
+            logger.error(f'[{item_data["order_num"]}] send_changelog API 요청 실패: {response.text}')
 
+def update_version_file(version_file_path, version_json, item_name_list, download_short_list):
+    """Cleans up and saves the updated version file."""
+    cleanup_version_json(version_json['files'])
     version_json['name-list'] = item_name_list
     version_json['short-list'] = download_short_list
     
-    file.seek(0)
-    file.truncate()
-    simdjson.dump(version_json, fp = file, indent = 4)
-    
-    file.close()
+    with open(version_file_path, 'w') as f:
+        simdjson.dump(version_json, fp=f, indent=4)
 
-path_list = []
-current_level = 0
-highest_level = 0
-current_count = 0
-def init_pathinfo(root):
-    global path_list, current_level, highest_level, current_count, saved_prehash
-    
-    if highest_level < current_level:
-        highest_level = current_level
-    
-    files = root.get('files', None)
-    if files is None:
+def init_update_check(item): # This is the main orchestrator function
+    item_data = prepare_item_data(item)
+    order_num = item_data["order_num"]
+
+    try:
+        download_url_list, product_info_list, download_short_list, thumblist = fetch_booth_data(item_data)
+    except BoothCrawlError as e:
+        logger.debug(f"Crawling failed for {order_num}: {e}")
         return
-    
-    current_level += 1
-    
-    for file in files.keys():
-        file_info = {'line_str': "", 'status': root['files'][file]['mark_as']}
+    except Exception as e:
+        logger.exception(f"An unexpected error occurred during fetch_booth_data for {order_num}")
+        return
 
-        for loop in range(0, current_level - 1):
-            file_info['line_str'] += '        '
+    product_name, product_url = product_info_list[0]
+    if item_data["name"] is None:
+        item_data["name"] = product_name
+
+    version_info = load_and_compare_version(order_num, download_short_list) # This is the new, correct function
+    if not version_info:
+        return
+
+    version_file_path, version_json = version_info
+
+    local_list = version_json.get('short-list', [])
+    local_list_name = version_json.get('name-list', [])
+    
+    item_name_list = process_files_for_changelog(item_data, download_url_list, local_list) # This is a new helper function
+
+    changelog_html_path, s3_object_url, summary_result = None, None, None
+    if item_data["changelog_show"]:
+        changelog_html_path, s3_object_url, summary_result = generate_changelog_and_summary(item_data, download_url_list, version_json)
+
+    thumb = thumblist[0] if thumblist else "https://asset.booth.pm/assets/thumbnail_placeholder_f_150x150-73e650fbec3b150090cbda36377f1a3402c01e36ff9fa96158de6016fa067d01.png"
+
+    send_discord_notification(
+        item_data, (product_name, product_url), thumb, local_list_name,
+        item_name_list, changelog_html_path, s3_object_url, summary_result
+    )
+    
+    update_version_file(version_file_path, version_json, item_name_list, download_short_list)
+
+def generate_path_info(root, saved_prehash):
+    path_list = []
+    _generate_path_info_recursive(root, saved_prehash, path_list)
+    return path_list
+
+def _generate_path_info_recursive(root, saved_prehash, path_list, current_level=0):
+    files = root.get('files')
+    if not files:
+        return
+
+    for file_name, file_node in files.items():
+        file_info = {'line_str': "", 'status': file_node['mark_as']}
+
+        file_info['line_str'] += ' ' * 8 * current_level
 
         symbol = ''
         if file_info['status'] == 1:
@@ -291,86 +297,67 @@ def init_pathinfo(root):
         elif file_info['status'] == 3:
             symbol = '(Changed)'
 
-        hash = root['files'][file]['hash']
-        old_name = saved_prehash.get(hash, None)
+        hash_val = file_node['hash']
+        old_name = saved_prehash.get(hash_val)
 
-        # UM..
         if old_name is not None:
-            if file_info['status'] == 2: 
+            if file_info['status'] == 2:
                 continue
-            elif file != old_name:
+            elif file_name != old_name:
                 file_info['status'] = 0
-                file_info['line_str'] += f'{old_name} → {file} {symbol}'
+                file_info['line_str'] += f'{old_name} → {file_name}'
             else:
-                file_info['line_str'] += f'{file} {symbol}'
+                file_info['line_str'] += f'{file_name} {symbol}'
         else:
-            file_info['line_str'] += f'{file} {symbol}'
+            file_info['line_str'] += f'{file_name} {symbol}'
 
         path_list.append(file_info)
-        current_count += 1
-        
-        init_pathinfo(root['files'][file])
-        
-    current_level -= 1
+        _generate_path_info_recursive(file_node, saved_prehash, path_list, current_level + 1)
 
-json_level = []
-saved_prehash = {}
-def init_file_process(input_path, filename, version_json, encoding):
-    json_level.append(filename)
+def process_file_tree(input_path, filename, version_json, encoding, current_path, order_num):
+    current_path.append(filename)
     
-    pathstr = ''
-    for entry in json_level:
-        pathstr += f'{entry}/' 
-    pathstr = pathstr[:-1]
+    pathstr = '/'.join(current_path)
     
     isdir = os.path.isdir(input_path)
     filehash = ""
     if not isdir:
         filehash = calc_file_hash(input_path)
-        # print(f'{process_path} ({filehash})')
     else:
         filehash = "DIRECTORY"
         
     process_path = f'./process/{pathstr}'
     try:
         zip_type = try_extract(input_path, filename, process_path, encoding)
-    except:
-        logger.error(f'[{order_num}] error occured on extracting {filename}')
-        json_level.pop()
+    except Exception as e:
+        logger.error(f'[{order_num}] error occured on extracting {filename}: {e}')
+        logger.debug(traceback.format_exc())
+        current_path.pop()
         end_file_process(0, process_path)
         return
     
-    json = version_json['files']
-    for entry in range(0, len(json_level) - 1, 1):
-        pre_json = json.get(json_level[entry], None)
-        json = pre_json.get('files', None)
+    node = version_json
+    for part in current_path[:-1]:
+        node = node.setdefault('files', {}).setdefault(part, {})
 
-    if json is None:
-        json = pre_json['files'] = {}
-        
-    pre_json = json
-    json = pre_json.get(filename, None)
-    
-    if json is None:
-        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
-    else:
-        pre_json[filename]['mark_as'] = 0 if pre_json[json_level[-1]]['hash'] == filehash else 3
+    parent_dict = node.setdefault('files', {})
+    file_node = parent_dict.get(filename)
 
-    if json is None:
-        pre_json[filename] = {'hash': filehash, 'mark_as': 1}
+    if file_node is None:
+        parent_dict[filename] = {'hash': filehash, 'mark_as': 1}
     else:
-        if pre_json[filename]['hash'] == filehash:
-            pre_json[filename]['mark_as'] = 0
+        if file_node['hash'] == filehash:
+            file_node['mark_as'] = 0
         else:
-            pre_json[filename]['hash'] = filehash  # 해시값 업데이트 추가
-            pre_json[filename]['mark_as'] = 3
+            file_node['hash'] = filehash
+            file_node['mark_as'] = 3
         
     if zip_type > 0 or os.path.isdir(process_path):
         for new_filename in os.listdir(process_path):
             new_process_path = os.path.join(process_path, new_filename)
-            init_file_process(new_process_path, new_filename, version_json, encoding)
+            process_file_tree(new_process_path, new_filename, version_json, encoding, current_path, order_num)
 
-    json_level.pop()
+    current_path.pop()
     end_file_process(zip_type, process_path)
     
         
@@ -384,31 +371,27 @@ def end_file_process(zip_type, process_path):
     
 # NOTE: Currently, @encoding only applies on zip_type == 1
 def try_extract(input_path, input_filename, output_path, encoding):
+    """Extracts a file if it's a zip or unitypackage, otherwise just moves it."""
     zip_type = is_compressed(input_path)
     
-    if zip_type == 1:
-        temp_output = f'./{input_filename}'
-        shutil.move(input_path, temp_output)
-        zip_file = zipfile.ZipFile(temp_output, 'r', metadata_encoding=encoding)
-
-        os.makedirs(output_path, exist_ok=True)
-        try:
-            zip_file.extractall(output_path)
-        except:
-            raise
-        zip_file.close()
-        os.remove(temp_output)
-    elif zip_type == 2:
-        temp_output = f'./{input_filename}'
-        shutil.move(input_path, temp_output)
-        
-        os.makedirs(output_path, exist_ok=True)
-        extractPackage(temp_output, outputPath=output_path)
-        
-        os.remove(temp_output)
-    else:
+    if zip_type == 0:
         shutil.move(input_path, output_path)
-        
+        return zip_type
+
+    # For compressed files, move to a temporary location for extraction
+    temp_output = f'./{input_filename}'
+    shutil.move(input_path, temp_output)
+    os.makedirs(output_path, exist_ok=True)
+
+    try:
+        if zip_type == 1:  # zip
+            with zipfile.ZipFile(temp_output, 'r', metadata_encoding=encoding) as zip_file:
+                zip_file.extractall(output_path)
+        elif zip_type == 2:  # unitypackage
+            extractPackage(temp_output, outputPath=output_path)
+    finally:
+        os.remove(temp_output)
+
     return zip_type
 
 
@@ -441,33 +424,29 @@ def element_mark(root, mark_as, current_filename, prehash_dict):
         and hash != 'DIRECTORY'):
         prehash_dict[hash] = current_filename
 
-    files = root.get('files', None)
-    if files is None:
+    files = root.get('files')
+    if not files:
         return
         
     for file in files.keys():
         element_mark(root['files'][file], mark_as, file, prehash_dict)
 
-delete_keys = []
-def remove_element_mark(previous, root, root_name):
-    global delete_keys
-    
-    if root['mark_as'] == 2:
-        delete_keys.append([previous, root_name])
-        return
-    
-    del root['mark_as']
-
-    files = root.get('files', None)
-    if files is None:
-        return
+def cleanup_version_json(files_root):
+    """Recursively removes 'mark_as' and deletes nodes marked for deletion."""
+    keys_to_delete = []
+    for key, node in files_root.items():
+        if node.get('mark_as') == 2:
+            keys_to_delete.append(key)
+            continue
         
-    for file in files.keys():
-        remove_element_mark(root['files'], root['files'][file], file)
-
-
-def process_delete_keys(previous, root_name):
-    del previous[root_name]
+        if 'mark_as' in node:
+            del node['mark_as']
+        
+        if 'files' in node and node['files']:
+            cleanup_version_json(node['files'])
+            
+    for key in keys_to_delete:
+        del files_root[key]
 
 def build_tree(paths):
     tree = {}
@@ -577,7 +556,7 @@ def files_list(tree):
 
     return raw_data
 
-def send_error_message(discord_channel_id, discord_user_id):
+def send_error_message(discord_channel_id, discord_user_id, order_num):
     api_url = f'{discord_api_url}/send_error_message'
 
     data = {
@@ -601,12 +580,9 @@ if __name__ == "__main__":
     )
     logger = logging.getLogger(__name__)
 
-    current_time = ''
     def strftime_now():
-        global current_time
-        current_time = datetime.now().strftime('%Y%m%d-%H%M%S')
-        return current_time
-    
+        return datetime.now().strftime('%Y%m%d-%H%M%S')
+
     with open("config.json") as file:
         config_json = simdjson.load(file)
     discord_api_url = config_json['discord_api_url']
@@ -616,10 +592,14 @@ if __name__ == "__main__":
     except:
         logger.info("Gemini API key not found")
     refresh_interval = int(config_json['refresh_interval'])
+    
+    s3_uploader = None
     try:
         s3 = config_json['s3']
+        s3_uploader = cloudflare.S3Uploader(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
     except:
         s3 = None
+
 
     createFolder("./version")
     createFolder("./version/db")
@@ -632,42 +612,56 @@ if __name__ == "__main__":
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
 
     # booth_discord 컨테이너 시작 대기
-    sleep(15)
+    logger.info("Waiting for booth_discord container to start...")
+    # A simple heartbeat check for the discord API
+    for _ in range(5): # Try 5 times
+        try:
+            response = requests.get(f"{discord_api_url}/", timeout=5)
+            if response.status_code == 404: # Quart returns 404 for base URL by default
+                logger.info("booth_discord container is ready.")
+                break
+        except requests.ConnectionError:
+            logger.info("booth_discord not ready yet, waiting...")
+            sleep(5)
+    else:
+        logger.error("Could not connect to booth_discord container. Exiting.")
+        return
 
     while True:
-        logger.info("BoothChecker started")
+        logger.info("BoothChecker cycle started")
+
+        # BOOTH Heartbeat check once per cycle
+        try:
+            logger.info('Checking BOOTH heartbeat')
+            requests.get("https://booth.pm", timeout=10)
+        except requests.RequestException as e:
+            logger.error(f'BOOTH heartbeat failed: {e}. Skipping this cycle.')
+            sleep(refresh_interval)
+            continue
+
+        # Recreate temporary folders
+        recreate_folder("./download")
+        recreate_folder("./process")
 
         booth_items = booth_db.get_booth_items()
-    
-        # FIXME: Due to having PermissionError issue, clean temp stuff on each initiation.
-        shutil.rmtree("./download")
-        shutil.rmtree("./process")
+        logger.info(f"Found {len(booth_items)} items to check.")
 
-        createFolder("./download")
-        createFolder("./process")
-        
-        current_time = strftime_now()
-        
         for item in booth_items:
             order_num = item[0]
-            # BOOTH Heartbeat
-            # SKT™, KT™, U+™ Sucks. Thank you.
-            
-            try:
-                logger.info(f'[{order_num}] Checking BOOTH heartbeat')
-                requests.get("https://booth.pm")
-            except:
-                logger.error(f'[{order_num}] BOOTH heartbeat failed')
-                break
-        
             try:
                 init_update_check(item)
             except PermissionError:
                 logger.error(f'[{order_num}] PermissionError occured')
             except Exception as e:
-                logger.error(f'[{order_num}] error occured on checking\n{e}')
+                logger.exception(f'[{order_num}] An unexpected error occurred while checking item.')
             
         # 갱신 대기
-        logger.info("BoothChecker finished")
+        logger.info("BoothChecker cycle finished")
         logger.info(f"Next check will be at {datetime.now() + timedelta(seconds=refresh_interval)}")
         sleep(refresh_interval)
+
+def recreate_folder(path):
+    """Deletes a folder and all its contents, then recreates it."""
+    if os.path.exists(path):
+        shutil.rmtree(path)
+    os.makedirs(path)
