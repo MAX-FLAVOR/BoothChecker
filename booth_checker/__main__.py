@@ -9,6 +9,7 @@ import uuid
 import logging
 from datetime import datetime, timedelta
 from time import sleep
+from concurrent.futures import ThreadPoolExecutor
 from jinja2 import Environment, FileSystemLoader
 
 from operator import length_hint
@@ -579,6 +580,15 @@ def recreate_folder(path):
         shutil.rmtree(path)
     os.makedirs(path)
 
+def run_update_check_safely(item):
+    order_num = item[0]
+    try:
+        init_update_check(item)
+    except PermissionError:
+        logger.error(f'[{order_num}] PermissionError occured')
+    except Exception as e:
+        logger.exception(f'[{order_num}] An unexpected error occurred while checking item.')
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
@@ -599,6 +609,11 @@ if __name__ == "__main__":
     except:
         logger.info("Gemini API key not found")
     refresh_interval = int(config_json['refresh_interval'])
+
+    # Calculate default workers based on CPU count
+    cpu_cores = os.cpu_count()
+    default_workers = (cpu_cores + 4) if cpu_cores is not None else 8
+    max_workers = int(config_json.get('max_workers', default_workers))
     
     s3_uploader = None
     try:
@@ -652,14 +667,8 @@ if __name__ == "__main__":
         booth_items = booth_db.get_booth_items()
         logger.info(f"Found {len(booth_items)} items to check.")
 
-        for item in booth_items:
-            order_num = item[0]
-            try:
-                init_update_check(item)
-            except PermissionError:
-                logger.error(f'[{order_num}] PermissionError occured')
-            except Exception as e:
-                logger.exception(f'[{order_num}] An unexpected error occurred while checking item.')
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            executor.map(run_update_check_safely, booth_items)
             
         # 갱신 대기
         logger.info("BoothChecker cycle finished")
