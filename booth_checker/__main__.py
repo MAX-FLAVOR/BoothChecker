@@ -21,6 +21,8 @@ import booth_sqlite
 import cloudflare
 import llm_summary
 
+TEST_MODE = False
+
 class BoothCrawlError(Exception):
     """Custom exception for BOOTH crawling failures."""
     pass
@@ -173,24 +175,32 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
     
     summary_result = None
     summary_data = files_list(tree)
-    if item_data["summary_this"] and gemini_api_key and summary_data:
+    if item_data["summary_this"] and gemini_api_key and summary_data and not TEST_MODE:
         logger.info(f'[{item_data["order_num"]}] Generating summary')
         summary_result = f"{summary.chat(summary_data)}"
         logger.debug(summary_result)
+    elif item_data["summary_this"] and gemini_api_key and summary_data and TEST_MODE:
+        logger.info(f'[{item_data["order_num"]}] Test mode: Skipping summary generation.')
     
     s3_object_url = None
-    if s3_uploader:
+    if s3_uploader and not TEST_MODE:
         try:
             s3_uploader.upload(changelog_html_path, s3['bucket_name'], changelog_html_path)
             logger.info(f'[{item_data["order_num"]}] Changelog uploaded to S3')
             s3_object_url = f"https://{s3['bucket_access_url']}/{changelog_html_path}"
         except Exception as e:
             logger.error(f'[{item_data["order_num"]}] Error occurred while uploading changelog to S3: {e}')
+    elif s3_uploader and TEST_MODE:
+        logger.info(f'[{item_data["order_num"]}] Test mode: Skipping changelog upload to S3.')
 
     return changelog_html_path, s3_object_url, summary_result
 
 def send_discord_notification(item_data, product_info, thumb, local_list_name, item_name_list, changelog_html_path, s3_object_url, summary_result):
     """Sends update notification to Discord."""
+    if TEST_MODE:
+        logger.info(f'[{item_data["order_num"]}] Test mode: Skipping Discord notification.')
+        return
+
     api_url = f'{discord_api_url}/send_message'
     product_name, product_url = product_info
     author_info = booth.crawling_product(product_url)
@@ -559,6 +569,10 @@ def files_list(tree):
     return raw_data
 
 def send_error_message(discord_channel_id, discord_user_id, order_num):
+    if TEST_MODE:
+        logger.info(f'[{order_num}] Test mode: Skipping Discord error notification.')
+        return
+
     api_url = f'{discord_api_url}/send_error_message'
 
     data = {
@@ -602,24 +616,35 @@ if __name__ == "__main__":
 
     with open("config.json") as file:
         config_json = simdjson.load(file)
+        
+    # Configure global settings
     discord_api_url = config_json['discord_api_url']
-    try:
-        gemini_api_key = config_json['gemini_api_key']
+    gemini_api_key = config_json.get('gemini_api_key')
+    if gemini_api_key:
         summary = llm_summary.google_gemini_api(gemini_api_key)
-    except:
+    else:
+        summary = None
         logger.info("Gemini API key not found")
+        
     refresh_interval = int(config_json['refresh_interval'])
+    
+    TEST_MODE = config_json.get('test_mode', False)
+    logger.info(f"Test mode is {'enabled' if TEST_MODE else 'disabled'}.")
 
     # Calculate default workers based on CPU count
     cpu_cores = os.cpu_count()
     default_workers = (cpu_cores + 4) if cpu_cores is not None else 8
     max_workers = int(config_json.get('max_workers', default_workers))
+    logger.info(f"Using {max_workers} worker threads for parallel processing.")
     
     s3_uploader = None
-    try:
-        s3 = config_json['s3']
-        s3_uploader = cloudflare.S3Uploader(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
-    except:
+    s3 = config_json.get('s3')
+    if s3:
+        try:
+            s3_uploader = cloudflare.S3Uploader(s3['endpoint_url'], s3['access_key_id'], s3['secret_access_key'])
+        except Exception as e:
+            logger.error(f"Failed to initialize S3 uploader: {e}")
+    else:
         s3 = None
 
     createFolder("./version")
@@ -632,21 +657,24 @@ if __name__ == "__main__":
 
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
 
-    # booth_discord 컨테이너 시작 대기
-    logger.info("Waiting for booth_discord container to start...")
-    # A simple heartbeat check for the discord API
-    for _ in range(5): # Try 5 times
-        try:
-            response = requests.get(f"{discord_api_url}/", timeout=5)
-            if response.status_code == 404: # Quart returns 404 for base URL by default
-                logger.info("booth_discord container is ready.")
-                break
-        except requests.ConnectionError:
-            logger.info("booth_discord not ready yet, waiting...")
-            sleep(5)
+    if not TEST_MODE:
+        # booth_discord 컨테이너 시작 대기
+        logger.info("Waiting for booth_discord container to start...")
+        # A simple heartbeat check for the discord API
+        for _ in range(5): # Try 5 times
+            try:
+                response = requests.get(f"{discord_api_url}/", timeout=5)
+                if response.status_code == 404: # Quart returns 404 for base URL by default
+                    logger.info("booth_discord container is ready.")
+                    break
+            except requests.ConnectionError:
+                logger.info("booth_discord not ready yet, waiting...")
+                sleep(5)
+        else:
+            logger.error("Could not connect to booth_discord container. Exiting.")
+            exit(1)
     else:
-        logger.error("Could not connect to booth_discord container. Exiting.")
-        exit(1)
+        logger.info("Test mode enabled, skipping booth_discord container check.")
 
     while True:
         logger.info("BoothChecker cycle started")
