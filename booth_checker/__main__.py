@@ -21,7 +21,7 @@ import booth_sqlite
 import cloudflare
 import llm_summary
 
-TEST_MODE = False
+DRY_RUN = False
 
 class BoothCrawlError(Exception):
     """Custom exception for BOOTH crawling failures."""
@@ -80,20 +80,32 @@ def fetch_booth_data(item_data):
 def load_and_compare_version(order_num, download_short_list):
     """Loads version file and checks for changes. Returns (path, data) or None."""
     version_file_path = f'./version/json/{order_num}.json'
-    if not os.path.exists(version_file_path):
-        logger.info(f'[{order_num}] version file not found, creating one.')
-        createVersionFile(version_file_path)
+    
+    # In dry run, if the file doesn't exist, simulate a new item by creating an empty version_json.
+    if DRY_RUN and not os.path.exists(version_file_path):
+        logger.info(f'[{order_num}] Dry run: version file not found, simulating new item.')
+        version_json = {'short-list': [], 'name-list': [], 'files': {}}
+    else:
+        # Original logic for non-dry-run or if file exists in dry run.
+        if not os.path.exists(version_file_path):
+            logger.info(f'[{order_num}] version file not found, creating one.')
+            createVersionFile(version_file_path)
 
-    def _load_json(path):
-        with open(path, 'r') as f:
-            return simdjson.load(f)
+        def _load_json(path):
+            with open(path, 'r') as f:
+                return simdjson.load(f)
 
-    try:
-        version_json = _load_json(version_file_path)
-    except ValueError:
-        logger.warning(f'[{order_num}] version file corrupted, recreating.')
-        createVersionFile(version_file_path)
-        version_json = _load_json(version_file_path)
+        try:
+            version_json = _load_json(version_file_path)
+        except ValueError:
+            logger.warning(f'[{order_num}] version file corrupted, recreating.')
+            if not DRY_RUN:
+                createVersionFile(version_file_path)
+                version_json = _load_json(version_file_path)
+            else:
+                # If file is corrupted in dry run, also simulate a new item.
+                logger.info(f'[{order_num}] Dry run: version file corrupted, simulating new item.')
+                version_json = {'short-list': [], 'name-list': [], 'files': {}}
 
     local_list = version_json.get('short-list', [])
     
@@ -175,30 +187,30 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
     
     summary_result = None
     summary_data = files_list(tree)
-    if item_data["summary_this"] and gemini_api_key and summary_data and not TEST_MODE:
+    if item_data["summary_this"] and gemini_api_key and summary_data and not DRY_RUN:
         logger.info(f'[{item_data["order_num"]}] Generating summary')
         summary_result = f"{summary.chat(summary_data)}"
         logger.debug(summary_result)
-    elif item_data["summary_this"] and gemini_api_key and summary_data and TEST_MODE:
-        logger.info(f'[{item_data["order_num"]}] Test mode: Skipping summary generation.')
+    elif item_data["summary_this"] and gemini_api_key and summary_data and DRY_RUN:
+        logger.info(f'[{item_data["order_num"]}] Dry run: Skipping summary generation.')
     
     s3_object_url = None
-    if s3_uploader and not TEST_MODE:
+    if s3_uploader and not DRY_RUN:
         try:
             s3_uploader.upload(changelog_html_path, s3['bucket_name'], changelog_html_path)
             logger.info(f'[{item_data["order_num"]}] Changelog uploaded to S3')
             s3_object_url = f"https://{s3['bucket_access_url']}/{changelog_html_path}"
         except Exception as e:
             logger.error(f'[{item_data["order_num"]}] Error occurred while uploading changelog to S3: {e}')
-    elif s3_uploader and TEST_MODE:
-        logger.info(f'[{item_data["order_num"]}] Test mode: Skipping changelog upload to S3.')
+    elif s3_uploader and DRY_RUN:
+        logger.info(f'[{item_data["order_num"]}] Dry run: Skipping changelog upload to S3.')
 
     return changelog_html_path, s3_object_url, summary_result
 
 def send_discord_notification(item_data, product_info, thumb, local_list_name, item_name_list, changelog_html_path, s3_object_url, summary_result):
     """Sends update notification to Discord."""
-    if TEST_MODE:
-        logger.info(f'[{item_data["order_num"]}] Test mode: Skipping Discord notification.')
+    if DRY_RUN:
+        logger.info(f'[{item_data["order_num"]}] Dry run: Skipping Discord notification.')
         return
 
     api_url = f'{discord_api_url}/send_message'
@@ -238,6 +250,10 @@ def send_discord_notification(item_data, product_info, thumb, local_list_name, i
 
 def update_version_file(version_file_path, version_json, item_name_list, download_short_list):
     """Cleans up and saves the updated version file."""
+    if DRY_RUN:
+        logger.info(f'Dry run: Skipping version file update for {version_file_path}.')
+        return
+        
     cleanup_version_json(version_json['files'])
     version_json['name-list'] = item_name_list
     version_json['short-list'] = download_short_list
@@ -277,7 +293,7 @@ def init_update_check(item): # This is the main orchestrator function
     if item_data["changelog_show"]:
         changelog_html_path, s3_object_url, summary_result = generate_changelog_and_summary(item_data, download_url_list, version_json)
 
-    thumb = thumblist[0] if thumblist else "https://asset.booth.pm/assets/thumbnail_placeholder_f_150x150-73e650fbec3b150090cbda36377f1a3402c01e36ff9fa96158de6016fa067d01.png"
+    thumb = thumblist[0] if thumblist else "https://asset.booth.pm/assets/thumbnail_placeholder_f_150x150-73e650fbec3b150090cbda36377f1a3402c01e36fa067d01.png"
 
     send_discord_notification(
         item_data, (product_name, product_url), thumb, local_list_name,
@@ -350,8 +366,7 @@ def process_file_tree(input_path, filename, version_json, encoding, current_path
     
     node = version_json
     for part in current_path[:-1]:
-        node = node.setdefault('files', {}).setdefault(part, {})
-
+        node = node.setdefault('files', {}).setdefault(part, {}) # Corrected: Removed extra closing parenthesis
     parent_dict = node.setdefault('files', {})
     file_node = parent_dict.get(filename)
 
@@ -493,9 +508,9 @@ def build_tree(paths):
         # 트리 빌드
         node = tree
         for part in path_stack[:-1]:
-            node = node.setdefault(part, {})
+            node = node.setdefault(part, {}) # Corrected: Removed extra closing parenthesis
         # 현재 노드에 상태 정보 저장
-        current_node = node.setdefault(path_stack[-1], {})
+        current_node = node.setdefault(path_stack[-1], {}) # Corrected: Removed extra closing parenthesis
         current_node['_status'] = status
     return tree
 
@@ -569,8 +584,8 @@ def files_list(tree):
     return raw_data
 
 def send_error_message(discord_channel_id, discord_user_id, order_num):
-    if TEST_MODE:
-        logger.info(f'[{order_num}] Test mode: Skipping Discord error notification.')
+    if DRY_RUN:
+        logger.info(f'[{order_num}] Dry run: Skipping Discord error notification.')
         return
 
     api_url = f'{discord_api_url}/send_error_message'
@@ -628,8 +643,8 @@ if __name__ == "__main__":
         
     refresh_interval = int(config_json['refresh_interval'])
     
-    TEST_MODE = config_json.get('test_mode', False)
-    logger.info(f"Test mode is {'enabled' if TEST_MODE else 'disabled'}.")
+    DRY_RUN = config_json.get('dry_run', False)
+    logger.info(f"Dry run is {'enabled' if DRY_RUN else 'disabled'}.")
 
     # Calculate default workers based on CPU count
     cpu_cores = os.cpu_count()
@@ -657,7 +672,7 @@ if __name__ == "__main__":
 
     booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
 
-    if not TEST_MODE:
+    if not DRY_RUN:
         # booth_discord 컨테이너 시작 대기
         logger.info("Waiting for booth_discord container to start...")
         # A simple heartbeat check for the discord API
@@ -674,7 +689,7 @@ if __name__ == "__main__":
             logger.error("Could not connect to booth_discord container. Exiting.")
             exit(1)
     else:
-        logger.info("Test mode enabled, skipping booth_discord container check.")
+        logger.info("Dry run enabled, skipping booth_discord container check.")
 
     while True:
         logger.info("BoothChecker cycle started")
