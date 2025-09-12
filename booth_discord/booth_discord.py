@@ -64,7 +64,7 @@ class DiscordBot(commands.Bot):
                     intent_encoding,
                     summary_this,
                 )
-                self.logger.info(f"User {interaction.user.id} is adding item with item number {item_number}")
+                self.logger.info(f"User {interaction.user.id} is adding item {item_number}")
                 await interaction.followup.send(f"[{item_number}] 등록 완료", ephemeral=True)
             except Exception as e:
                 self.logger.error(f"Error occurred while adding BOOTH item: {e}")
@@ -88,7 +88,7 @@ class DiscordBot(commands.Bot):
         async def item_del(interaction: discord.Interaction, item: str):
             try:
                 self.booth_db.del_booth_item(interaction.user.id, item)
-                self.logger.info(f"User {interaction.user.id} is removing item with order number {item}")
+                self.logger.info(f"User {interaction.user.id} is removing item {item}")
                 await interaction.response.send_message(f"[{item}] 삭제 완료", ephemeral=True)
             except Exception as e:
                 self.logger.error(f"Error occurred while removing BOOTH item: {e}")
