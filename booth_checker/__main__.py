@@ -29,7 +29,7 @@ thread_local = threading.local()
 
 class ContextFilter(logging.Filter):
     def filter(self, record):
-        record.order_num = getattr(thread_local, 'order_num', 'N/A')
+        record.order_num = getattr(thread_local, 'order_num', 'main')
         return True
 
 logger = logging.getLogger('BoothChecker')
