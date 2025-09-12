@@ -7,6 +7,7 @@ import requests
 import re
 import uuid
 import logging
+import threading
 from datetime import datetime, timedelta
 from time import sleep
 from concurrent.futures import ThreadPoolExecutor
@@ -22,6 +23,27 @@ import cloudflare
 import llm_summary
 
 DRY_RUN = False
+
+# Setup robust logger
+thread_local = threading.local()
+
+class ContextFilter(logging.Filter):
+    def filter(self, record):
+        record.order_num = getattr(thread_local, 'order_num', 'N/A')
+        return True
+
+logger = logging.getLogger('BoothChecker')
+logger.setLevel(logging.INFO)
+logger.propagate = False
+if not logger.hasHandlers():
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        '[%(asctime)s] - [%(levelname)s] - [%(order_num)s] - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.addFilter(ContextFilter())
 
 class BoothCrawlError(Exception):
     """Custom exception for BOOTH crawling failures."""
@@ -70,7 +92,7 @@ def fetch_booth_data(item_data):
         )
     
     if not download_url_list or not product_info_list:
-        error_msg = f'[{item_data["item_number"]}] Failed to crawl BOOTH page. The page structure might have changed or the session is invalid.'
+        error_msg = f'Failed to crawl BOOTH page. The page structure might have changed or the session is invalid.'
         logger.error(error_msg)
         send_error_message(item_data["discord_channel_id"], item_data["discord_user_id"], item_data["order_num"])
         raise BoothCrawlError(error_msg)
@@ -83,12 +105,12 @@ def load_and_compare_version(order_num, download_short_list):
     
     # In dry run, if the file doesn't exist, simulate a new item by creating an empty version_json.
     if DRY_RUN and not os.path.exists(version_file_path):
-        logger.info(f'[{order_num}] Dry run: version file not found, simulating new item.')
+        logger.info('Dry run: version file not found, simulating new item.')
         version_json = {'short-list': [], 'name-list': [], 'files': {}}
     else:
         # Original logic for non-dry-run or if file exists in dry run.
         if not os.path.exists(version_file_path):
-            logger.info(f'[{order_num}] version file not found, creating one.')
+            logger.info('version file not found, creating one.')
             createVersionFile(version_file_path)
 
         def _load_json(path):
@@ -98,13 +120,13 @@ def load_and_compare_version(order_num, download_short_list):
         try:
             version_json = _load_json(version_file_path)
         except ValueError:
-            logger.warning(f'[{order_num}] version file corrupted, recreating.')
+            logger.warning('version file corrupted, recreating.')
             if not DRY_RUN:
                 createVersionFile(version_file_path)
                 version_json = _load_json(version_file_path)
             else:
                 # If file is corrupted in dry run, also simulate a new item.
-                logger.info(f'[{order_num}] Dry run: version file corrupted, simulating new item.')
+                logger.info('Dry run: version file corrupted, simulating new item.')
                 version_json = {'short-list': [], 'name-list': [], 'files': {}}
 
     local_list = version_json.get('short-list', [])
@@ -116,14 +138,14 @@ def load_and_compare_version(order_num, download_short_list):
     )
 
     if not has_changed:
-        logger.info(f'[{order_num}] nothing has changed.')
+        logger.info('nothing has changed.')
         return None
 
     if not download_short_list:
-        logger.error(f'[{order_num}] BOOTH no responding, but change was detected.')
+        logger.error('BOOTH no responding, but change was detected.')
         return None
         
-    logger.info(f'[{order_num}] something has changed.')
+    logger.info('something has changed.')
     return version_file_path, version_json
 
 def process_files_for_changelog(item_data, download_url_list, local_list):
@@ -136,7 +158,7 @@ def process_files_for_changelog(item_data, download_url_list, local_list):
         item_name_list.append(filename)
 
         if item_data["changelog_show"] or item_data["archive_this"]:
-            logger.info(f'[{item_data["order_num"]}] downloading {download_number} to {download_path}')
+            logger.info(f'downloading {download_number} to {download_path}')
             booth.download_item(download_number, download_path, item_data["booth_cookie"])
 
         if item_data["archive_this"] and download_number not in local_list:
@@ -154,16 +176,16 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
         
     for _, filename in download_url_list:
         download_path = f'./download/{filename}'
-        logger.info(f'[{item_data["order_num"]}] parsing {filename} structure')
+        logger.info(f'parsing {filename} structure')
         try:
-            process_file_tree(download_path, filename, version_json, item_data["encoding"], [], item_data["order_num"])
+            process_file_tree(download_path, filename, version_json, item_data["encoding"], [])
         except Exception as e:
-            logger.error(f'[{item_data["order_num"]}] An error occurred while parsing {filename}: {e}')
+            logger.error(f'An error occurred while parsing {filename}: {e}')
             logger.debug(traceback.format_exc())
 
     path_list = generate_path_info(version_json, saved_prehash)
     if not path_list:
-        logger.warning(f'[{item_data["order_num"]}] path_list is empty. Changelog will not be generated.')
+        logger.warning('path_list is empty. Changelog will not be generated.')
         return None, None, None
     
     tree = build_tree(path_list)
@@ -188,29 +210,29 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
     summary_result = None
     summary_data = files_list(tree)
     if item_data["summary_this"] and gemini_api_key and summary_data and not DRY_RUN:
-        logger.info(f'[{item_data["order_num"]}] Generating summary')
+        logger.info('Generating summary')
         summary_result = f"{summary.chat(summary_data)}"
         logger.debug(summary_result)
     elif item_data["summary_this"] and gemini_api_key and summary_data and DRY_RUN:
-        logger.info(f'[{item_data["order_num"]}] Dry run: Skipping summary generation.')
+        logger.info('Dry run: Skipping summary generation.')
     
     s3_object_url = None
     if s3_uploader and not DRY_RUN:
         try:
             s3_uploader.upload(changelog_html_path, s3['bucket_name'], changelog_html_path)
-            logger.info(f'[{item_data["order_num"]}] Changelog uploaded to S3')
+            logger.info('Changelog uploaded to S3')
             s3_object_url = f"https://{s3['bucket_access_url']}/{changelog_html_path}"
         except Exception as e:
-            logger.error(f'[{item_data["order_num"]}] Error occurred while uploading changelog to S3: {e}')
+            logger.error(f'Error occurred while uploading changelog to S3: {e}')
     elif s3_uploader and DRY_RUN:
-        logger.info(f'[{item_data["order_num"]}] Dry run: Skipping changelog upload to S3.')
+        logger.info('Dry run: Skipping changelog upload to S3.')
 
     return changelog_html_path, s3_object_url, summary_result
 
 def send_discord_notification(item_data, product_info, thumb, local_list_name, item_name_list, changelog_html_path, s3_object_url, summary_result):
     """Sends update notification to Discord."""
     if DRY_RUN:
-        logger.info(f'[{item_data["order_num"]}] Dry run: Skipping Discord notification.')
+        logger.info('Dry run: Skipping Discord notification.')
         return
 
     api_url = f'{discord_api_url}/send_message'
@@ -235,18 +257,18 @@ def send_discord_notification(item_data, product_info, thumb, local_list_name, i
     response = requests.post(api_url, json=data)
     
     if response.status_code == 200:
-        logger.info(f'[{item_data["order_num"]}] send_message API 요청 성공')
+        logger.info('send_message API 요청 성공')
     else:
-        logger.error(f'[{item_data["order_num"]}] send_message API 요청 실패: {response.text}')
+        logger.error(f'send_message API 요청 실패: {response.text}')
     
     if item_data["changelog_show"] and changelog_html_path and not s3:
         api_url = f'{discord_api_url}/send_changelog'
         data = {'file': changelog_html_path, 'channel_id': item_data["discord_channel_id"]}
         response = requests.post(api_url, json=data)
         if response.status_code == 200:
-            logger.info(f'[{item_data["order_num"]}] send_changelog API 요청 성공')
+            logger.info('send_changelog API 요청 성공')
         else:
-            logger.error(f'[{item_data["order_num"]}] send_changelog API 요청 실패: {response.text}')
+            logger.error(f'send_changelog API 요청 실패: {response.text}')
 
 def update_version_file(version_file_path, version_json, item_name_list, download_short_list):
     """Cleans up and saves the updated version file."""
@@ -268,10 +290,10 @@ def init_update_check(item): # This is the main orchestrator function
     try:
         download_url_list, product_info_list, download_short_list, thumblist = fetch_booth_data(item_data)
     except BoothCrawlError as e:
-        logger.debug(f"Crawling failed for {order_num}: {e}")
+        logger.debug(f"Crawling failed: {e}")
         return
     except Exception as e:
-        logger.exception(f"An unexpected error occurred during fetch_booth_data for {order_num}")
+        logger.exception("An unexpected error occurred during fetch_booth_data")
         return
 
     product_name, product_url = product_info_list[0]
@@ -313,7 +335,7 @@ def _generate_path_info_recursive(root, saved_prehash, path_list, current_level=
         return
 
     for file_name, file_node in files.items():
-        file_info = {'line_str': "", 'status': file_node['mark_as']}
+        file_info = {'line_str': '', 'status': file_node['mark_as']}
 
         file_info['line_str'] += ' ' * 8 * current_level
 
@@ -342,7 +364,7 @@ def _generate_path_info_recursive(root, saved_prehash, path_list, current_level=
         path_list.append(file_info)
         _generate_path_info_recursive(file_node, saved_prehash, path_list, current_level + 1)
 
-def process_file_tree(input_path, filename, version_json, encoding, current_path, order_num):
+def process_file_tree(input_path, filename, version_json, encoding, current_path):
     current_path.append(filename)
     
     pathstr = '/'.join(current_path)
@@ -358,7 +380,7 @@ def process_file_tree(input_path, filename, version_json, encoding, current_path
     try:
         zip_type = try_extract(input_path, filename, process_path, encoding)
     except Exception as e:
-        logger.error(f'[{order_num}] error occured on extracting {filename}: {e}')
+        logger.error(f'error occured on extracting {filename}: {e}')
         logger.debug(traceback.format_exc())
         current_path.pop()
         end_file_process(0, process_path)
@@ -382,7 +404,7 @@ def process_file_tree(input_path, filename, version_json, encoding, current_path
     if zip_type > 0 or os.path.isdir(process_path):
         for new_filename in os.listdir(process_path):
             new_process_path = os.path.join(process_path, new_filename)
-            process_file_tree(new_process_path, new_filename, version_json, encoding, current_path, order_num)
+            process_file_tree(new_process_path, new_filename, version_json, encoding, current_path)
 
     current_path.pop()
     end_file_process(zip_type, process_path)
@@ -585,7 +607,7 @@ def files_list(tree):
 
 def send_error_message(discord_channel_id, discord_user_id, order_num):
     if DRY_RUN:
-        logger.info(f'[{order_num}] Dry run: Skipping Discord error notification.')
+        logger.info('Dry run: Skipping Discord error notification.')
         return
 
     api_url = f'{discord_api_url}/send_error_message'
@@ -598,9 +620,9 @@ def send_error_message(discord_channel_id, discord_user_id, order_num):
     response = requests.post(api_url, json=data)
 
     if response.status_code == 200:
-        logger.info(f'[{order_num}] send_error_message API 요청 성공')
+        logger.info('send_error_message API 요청 성공')
     else:
-        logger.error(f'[{order_num}] send_error_message API 요청 실패: {response.text}')
+        logger.error(f'send_error_message API 요청 실패: {response.text}')
     return
 
 def recreate_folder(path):
@@ -610,25 +632,21 @@ def recreate_folder(path):
     os.makedirs(path)
 
 def run_update_check_safely(item):
-    order_num = item[0]
+    thread_local.order_num = item[0]
     try:
         init_update_check(item)
     except PermissionError:
-        logger.error(f'[{order_num}] PermissionError occured')
+        logger.error('PermissionError occured')
     except Exception as e:
-        logger.exception(f'[{order_num}] An unexpected error occurred while checking item.')
+        logger.exception('An unexpected error occurred while checking item.')
+    finally:
+        if hasattr(thread_local, 'order_num'):
+            del thread_local.order_num
+
+def strftime_now():
+    return datetime.now().strftime('%Y%m%d-%H%M%S')
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format='[%(asctime)s] - [%(levelname)s] - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    logger = logging.getLogger(__name__)
-
-    def strftime_now():
-        return datetime.now().strftime('%Y%m%d-%H%M%S')
-
     with open("config.json") as file:
         config_json = simdjson.load(file)
         
