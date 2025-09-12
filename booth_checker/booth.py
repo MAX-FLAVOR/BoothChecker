@@ -87,7 +87,7 @@ def crawling_gift(order_num, cookie, shortlist=None, thumblist=None):
         'thumb_selector': 'img',
         'download_item_selector': 'div.w-full.text-left',
         'download_link_selector': 'a.no-underline.flex.items-center.flex.gap-4',
-        'filename_selector': "div[class='typography-14 !preserve-half-leading']"
+        'filename_selector': "div[class='min-w-0 break-words whitespace-pre-line']"
     }
     return _crawling_base(url, cookie, selectors, shortlist, thumblist)
 
