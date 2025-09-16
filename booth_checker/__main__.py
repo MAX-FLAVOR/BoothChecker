@@ -530,9 +530,9 @@ def build_tree(paths):
         # 트리 빌드
         node = tree
         for part in path_stack[:-1]:
-            node = node.setdefault(part, {}) # Corrected: Removed extra closing parenthesis
+            node = node.setdefault(part, {})
         # 현재 노드에 상태 정보 저장
-        current_node = node.setdefault(path_stack[-1], {}) # Corrected: Removed extra closing parenthesis
+        current_node = node.setdefault(path_stack[-1], {})
         current_node['_status'] = status
     return tree
 
