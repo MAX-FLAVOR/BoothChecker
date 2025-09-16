@@ -94,7 +94,7 @@ def fetch_booth_data(item_data):
     if not download_url_list or not product_info_list:
         error_msg = f'Failed to crawl BOOTH page. The page structure might have changed or the session is invalid.'
         logger.error(error_msg)
-        send_error_message(item_data["discord_channel_id"], item_data["discord_user_id"], item_data["order_num"])
+        send_error_message(item_data["discord_channel_id"], item_data["discord_user_id"])
         raise BoothCrawlError(error_msg)
 
     return download_url_list, product_info_list, download_short_list, thumblist
@@ -605,7 +605,7 @@ def files_list(tree):
 
     return raw_data
 
-def send_error_message(discord_channel_id, discord_user_id, order_num):
+def send_error_message(discord_channel_id, discord_user_id):
     if DRY_RUN:
         logger.info('Dry run: Skipping Discord error notification.')
         return
