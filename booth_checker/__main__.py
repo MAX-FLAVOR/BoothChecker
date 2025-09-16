@@ -88,7 +88,7 @@ def fetch_booth_data(item_data):
         )
     else:
         download_url_list, product_info_list = booth.crawling(
-            item_data["order_num"], item_data["item_number"], item_data["booth_cookie"], download_short_list, thumblist
+            item_data["order_num"], [item_data["item_number"]], item_data["booth_cookie"], download_short_list, thumblist
         )
     
     if not download_url_list or not product_info_list:
