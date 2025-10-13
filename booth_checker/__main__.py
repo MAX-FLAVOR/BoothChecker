@@ -665,8 +665,10 @@ if __name__ == "__main__":
     logger.info(f"Dry run is {'enabled' if DRY_RUN else 'disabled'}.")
 
     # Calculate default workers based on CPU count
-    cpu_cores = os.cpu_count()
-    default_workers = (cpu_cores + 4) if cpu_cores is not None else 8
+    # https://booth.pm/announcements/863 공지로 인한 수정
+    # cpu_cores = os.cpu_count()
+    # default_workers = (cpu_cores + 4) if cpu_cores is not None else 8
+    default_workers = 2
     max_workers = int(config_json.get('max_workers', default_workers))
     logger.info(f"Using {max_workers} worker threads for parallel processing.")
     
