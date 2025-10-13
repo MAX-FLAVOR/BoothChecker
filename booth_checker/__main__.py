@@ -22,7 +22,7 @@ import booth_sqlite
 import cloudflare
 import llm_summary
 
-DRY_RUN = False
+DRY_RUN = None
 
 # Setup robust logger
 thread_local = threading.local()
