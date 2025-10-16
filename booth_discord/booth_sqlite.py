@@ -218,26 +218,3 @@ class BoothSQLite():
         self.cursor.execute('SELECT COUNT(*) FROM booth_items WHERE discord_user_id = ?', (discord_user_id,))
         result = self.cursor.fetchone()
         return result[0] if result else 0
-
-    def get_booth_items(self):
-        self.cursor.execute('''
-            SELECT  items.booth_order_number,
-                    items.booth_item_number,
-                    items.item_name,
-                    items.intent_encoding,
-                    items.download_number_show,
-                    items.changelog_show,
-                    items.archive_this,
-                    items.gift_item,
-                    items.summary_this,
-                    items.fbx_only,
-                    accounts.session_cookie,
-                    accounts.discord_user_id,
-                    channels.discord_channel_id
-            FROM booth_items items
-            INNER JOIN booth_accounts accounts
-                ON items.discord_user_id = accounts.discord_user_id
-            INNER JOIN discord_noti_channels channels
-                ON items.booth_order_number = channels.booth_order_number
-        ''')
-        return self.cursor.fetchall()
