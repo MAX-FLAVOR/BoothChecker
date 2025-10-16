@@ -33,7 +33,7 @@ def get_booth_order_info(item_number, cookie):
         
         product_div = soup.find("div", class_="flex desktop:flex-row mobile:flex-col")
         if not product_div:
-            raise Exception("상품이 존재하지 않습니다.")
+            raise Exception("상품이 존재하지 않거나, 구매하지 않은 상품입니다.")
         
         order_page = product_div.find("a").get("href")
         order_parse = parse_url(order_page)
