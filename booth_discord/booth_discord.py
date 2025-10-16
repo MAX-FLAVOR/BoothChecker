@@ -64,7 +64,7 @@ class DiscordBot(commands.Bot):
                     intent_encoding,
                     summary_this,
                 )
-                self.logger.info(f"User {interaction.user.id} is adding item with item number {item_number}")
+                self.logger.info(f"User {interaction.user.id} is adding item {item_number}")
                 await interaction.followup.send(f"[{item_number}] 등록 완료", ephemeral=True)
             except Exception as e:
                 self.logger.error(f"Error occurred while adding BOOTH item: {e}")
@@ -88,7 +88,7 @@ class DiscordBot(commands.Bot):
         async def item_del(interaction: discord.Interaction, item: str):
             try:
                 self.booth_db.del_booth_item(interaction.user.id, item)
-                self.logger.info(f"User {interaction.user.id} is removing item with order number {item}")
+                self.logger.info(f"User {interaction.user.id} is removing item {item}")
                 await interaction.response.send_message(f"[{item}] 삭제 완료", ephemeral=True)
             except Exception as e:
                 self.logger.error(f"Error occurred while removing BOOTH item: {e}")
@@ -123,7 +123,7 @@ class DiscordBot(commands.Bot):
 
     def setup_routes(self):
         @self.app.route("/send_message", methods=["POST"])
-        async def send_message():
+        async def handle_send_message():
             data = await request.get_json()
 
             name = data.get("name")
@@ -157,16 +157,15 @@ class DiscordBot(commands.Bot):
             return jsonify({"status": "Message sent"}), 200
 
         @self.app.route("/send_error_message", methods=["POST"])
-        async def send_error_message():
+        async def handle_send_error_message():
             data = await request.get_json()
             channel_id = data.get("channel_id")
             user_id = data.get("user_id")
-            item_number = data.get("item_number")
-            await self.send_error_message(channel_id, user_id, item_number)
+            await self.send_error_message(channel_id, user_id)
             return jsonify({"status": "Error message sent"}), 200
         
         @self.app.route("/send_changelog", methods=["POST"])
-        async def send_changelog():
+        async def handle_send_changelog():
             data = await request.get_json()
             channel_id = data.get("channel_id")
             file = data.get("file")
@@ -215,23 +214,26 @@ class DiscordBot(commands.Bot):
         
         key = f'{discord_user_id}_error_count'
         count = self.error_counts.get(key, 0) + 1
-        self.logger.error(f"BOOTH session cookie expired for user {discord_user_id}. Error count: {count}")
+        self.logger.warning(f"Error checking items for user {discord_user_id}. Error count: {count}")
         self.error_counts[key] = count
 
         booth_item_count = self.booth_db.get_booth_item_count(discord_user_id)
         booth_item_count = max(booth_item_count, 1)  # Enforce a minimum threshold of 1
 
+        # Notify user only if errors persist for all their items and they haven't been notified yet.
         if count >= booth_item_count and discord_user_id not in self.error_count_user:
             self.error_count_user.add(discord_user_id)
             embed = discord.Embed(
-                title="BOOTH 세션 쿠키 만료됨",
-                description = (
-                    "2회 이상 BOOTH가 응답하지 않았습니다.\n"
-                    "/booth 명령어로 쿠키를 재등록해 주세요."
+                title="⚠️ BOOTH 아이템 확인 중 오류 발생",
+                description=(
+                    "등록된 아이템을 확인하는 중 반복적으로 오류가 발생했습니다.\n"
+                    "가장 일반적인 원인은 BOOTH 세션 쿠키 만료입니다.\n\n"
+                    "문제를 해결하려면 `/booth` 명령어로 쿠키를 재등록해 주세요."
                 ),
                 colour=discord.Color.red()
             )
             await channel.send(content=f'<@{discord_user_id}>', embed=embed)
+            self.logger.info(f"Sent persistent error notification to user {discord_user_id}")
 
     async def send_changelog(self, channel_id, file):
         channel = self.get_channel(int(channel_id))
