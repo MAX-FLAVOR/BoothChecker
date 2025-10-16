@@ -26,6 +26,7 @@ class BoothSQLite():
                 archive_this BOOLEAN,
                 gift_item BOOLEAN,
                 summary_this BOOLEAN,
+                fbx_only BOOLEAN,
                 FOREIGN KEY(discord_user_id) REFERENCES booth_accounts(discord_user_id)
             )
         ''')
@@ -50,7 +51,7 @@ class BoothSQLite():
         self.conn.commit()
         return self.cursor.lastrowid
     
-    def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, item_name, intent_encoding,summary_this):
+    def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, item_name, intent_encoding,summary_this, fbx_only):
         # Moved import to be local to avoid dependency issues in booth_checker
         from booth import get_booth_order_info
 
@@ -73,8 +74,9 @@ class BoothSQLite():
                                 archive_this,
                                 gift_item,
                                 summary_this
+                                fbx_only
                                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (booth_order_info[1],
                   booth_item_number,
                   discord_user_id,
@@ -84,7 +86,8 @@ class BoothSQLite():
                   True,
                   False,
                   booth_order_info[0],
-                  summary_this))
+                  summary_this,
+                  fbx_only))
             self.conn.commit()
             self.add_discord_noti_channel(discord_channel_id, booth_order_info[1])
             return self.cursor.lastrowid
@@ -227,6 +230,7 @@ class BoothSQLite():
                     items.archive_this,
                     items.gift_item,
                     items.summary_this,
+                    items.fbx_only,
                     accounts.session_cookie,
                     accounts.discord_user_id,
                     channels.discord_channel_id

@@ -47,12 +47,14 @@ class DiscordBot(commands.Bot):
         @app_commands.describe(item_name="아이템 이름을 입력 해주세요")
         @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요 (기본값: shift_jis)")
         @app_commands.describe(summary_this="업데이트 내용 요약 (기본값: True)")
+        @app_commands.describe(fbx_only="FBX 변경점만 확인 (기본값: False)")
         async def item_add(
             interaction: discord.Interaction,
             item_number: str,
             item_name: str = None,
             intent_encoding: str = "shift_jis",
-            summary_this: bool = True
+            summary_this: bool = True,
+            fbx_only: bool = False
         ):
             try:
                 await interaction.response.defer(ephemeral=True)
@@ -63,6 +65,7 @@ class DiscordBot(commands.Bot):
                     item_name,
                     intent_encoding,
                     summary_this,
+                    fbx_only,
                 )
                 self.logger.info(f"User {interaction.user.id} is adding item {item_number}")
                 await interaction.followup.send(f"[{item_number}] 등록 완료", ephemeral=True)
