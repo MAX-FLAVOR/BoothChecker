@@ -72,9 +72,10 @@ def prepare_item_data(item):
         "archive_this": bool(item[6]),
         "gift_item": bool(item[7]),
         "summary_this": bool(item[8]),
-        "booth_cookie": {"_plaza_session_nktz7u": item[9]},
-        "discord_user_id": item[10],
-        "discord_channel_id": item[11],
+        "fbx_only": bool(item[9]),
+        "booth_cookie": {"_plaza_session_nktz7u": item[10]},
+        "discord_user_id": item[11],
+        "discord_channel_id": item[12]
     }
 
 def fetch_booth_data(item_data):
@@ -99,14 +100,14 @@ def fetch_booth_data(item_data):
 
     return download_url_list, product_info_list, download_short_list, thumblist
 
-def load_and_compare_version(order_num, download_short_list):
-    """Loads version file and checks for changes. Returns (path, data) or None."""
+def load_and_compare_version(order_num, download_short_list, fbx_only):
+    """Loads version file, ensures structure, and reports whether the download list changed."""
     version_file_path = f'./version/json/{order_num}.json'
     
     # In dry run, if the file doesn't exist, simulate a new item by creating an empty version_json.
     if DRY_RUN and not os.path.exists(version_file_path):
         logger.info('Dry run: version file not found, simulating new item.')
-        version_json = {'short-list': [], 'name-list': [], 'files': {}}
+        version_json = {'short-list': [], 'name-list': [], 'files': {}, 'fbx-files': {}}
     else:
         # Original logic for non-dry-run or if file exists in dry run.
         if not os.path.exists(version_file_path):
@@ -127,7 +128,16 @@ def load_and_compare_version(order_num, download_short_list):
             else:
                 # If file is corrupted in dry run, also simulate a new item.
                 logger.info('Dry run: version file corrupted, simulating new item.')
-                version_json = {'short-list': [], 'name-list': [], 'files': {}}
+                version_json = {'short-list': [], 'name-list': [], 'files': {}, 'fbx-files': {}}
+
+    if 'fbx-files' not in version_json:
+        version_json['fbx-files'] = {}
+    if 'files' not in version_json:
+        version_json['files'] = {}
+    if 'name-list' not in version_json:
+        version_json['name-list'] = []
+    if 'short-list' not in version_json:
+        version_json['short-list'] = []
 
     local_list = version_json.get('short-list', [])
     
@@ -138,15 +148,19 @@ def load_and_compare_version(order_num, download_short_list):
     )
 
     if not has_changed:
-        logger.info('nothing has changed.')
-        return None
+        if not fbx_only:
+            logger.info('nothing has changed.')
+            return None, None, False
+        logger.info('Download list unchanged; checking FBX contents for differences.')
 
     if not download_short_list:
         logger.error('BOOTH no responding, but change was detected.')
-        return None
+        return None, None, False
         
-    logger.info('something has changed.')
-    return version_file_path, version_json
+    if has_changed:
+        logger.info('something has changed.')
+
+    return version_file_path, version_json, has_changed
 
 def process_files_for_changelog(item_data, download_url_list, local_list):
     """Downloads new files and archives them if configured."""
@@ -157,7 +171,9 @@ def process_files_for_changelog(item_data, download_url_list, local_list):
         download_path = f'./download/{filename}'
         item_name_list.append(filename)
 
-        if item_data["changelog_show"] or item_data["archive_this"]:
+        should_download = item_data["changelog_show"] or item_data["archive_this"] or item_data["fbx_only"]
+
+        if should_download:
             logger.info(f'downloading {download_number} to {download_path}')
             booth.download_item(download_number, download_path, item_data["booth_cookie"])
 
@@ -169,7 +185,14 @@ def process_files_for_changelog(item_data, download_url_list, local_list):
     return item_name_list
 
 def generate_changelog_and_summary(item_data, download_url_list, version_json):
-    """Generates changelog, summary, and uploads to S3 if configured."""
+    """Generates changelog content and returns metadata.
+
+    Returns:
+        tuple: (changelog_html_path, s3_object_url, summary_result, diff_found, new_fbx_records)
+    """
+    if item_data["fbx_only"]:
+        return generate_fbx_changelog_and_summary(item_data, download_url_list, version_json)
+
     saved_prehash = {}
     for local_file in version_json['files'].keys():
         element_mark(version_json['files'][local_file], 2, local_file, saved_prehash)
@@ -184,9 +207,10 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
             logger.debug(traceback.format_exc())
 
     path_list = generate_path_info(version_json, saved_prehash)
-    if not path_list:
-        logger.warning('path_list is empty. Changelog will not be generated.')
-        return None, None, None
+    diff_found = bool(path_list)
+    if not diff_found:
+        logger.info('No structural changes detected; skipping changelog generation.')
+        return None, None, None, False, None
     
     tree = build_tree(path_list)
     html_list_items = tree_to_html(tree)
@@ -227,7 +251,89 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
     elif s3_uploader and DRY_RUN:
         logger.info('Dry run: Skipping changelog upload to S3.')
 
-    return changelog_html_path, s3_object_url, summary_result
+    return changelog_html_path, s3_object_url, summary_result, diff_found, None
+
+
+def generate_fbx_changelog_and_summary(item_data, download_url_list, version_json):
+    """Generates changelog information for FBX-only tracking."""
+    previous_fbx = version_json.get('fbx-files', {}) or {}
+    current_fbx = {}
+
+    for _, filename in download_url_list:
+        download_path = f'./download/{filename}'
+        logger.info(f'parsing {filename} structure (FBX only)')
+        try:
+            process_file_tree(download_path, filename, None, item_data["encoding"], [], fbx_only=True, fbx_records=current_fbx)
+        except Exception as e:
+            logger.error(f'An error occurred while parsing {filename}: {e}')
+            logger.debug(traceback.format_exc())
+
+    added = []
+    changed = []
+
+    for name, new_hash in current_fbx.items():
+        old_hash = previous_fbx.get(name)
+        if old_hash is None:
+            added.append(name)
+        elif old_hash != new_hash:
+            changed.append(name)
+
+    deleted = [name for name in previous_fbx.keys() if name not in current_fbx]
+
+    if not added and not changed and not deleted:
+        logger.info('No FBX hash differences detected; skipping changelog generation.')
+        return None, None, None, False, current_fbx
+
+    path_list = []
+    for name in sorted(added):
+        path_list.append({'line_str': name, 'status': 1})
+    for name in sorted(changed):
+        path_list.append({'line_str': name, 'status': 3})
+    for name in sorted(deleted):
+        path_list.append({'line_str': name, 'status': 2})
+
+    tree = build_tree(path_list)
+    html_list_items = tree_to_html(tree) if item_data["changelog_show"] else ''
+    summary_data = files_list(tree)
+
+    changelog_html_path = None
+    s3_object_url = None
+    summary_result = None
+
+    if item_data["summary_this"] and gemini_api_key and summary_data and not DRY_RUN:
+        logger.info('Generating summary')
+        summary_result = f"{summary.chat(summary_data)}"
+        logger.debug(summary_result)
+    elif item_data["summary_this"] and gemini_api_key and summary_data and DRY_RUN:
+        logger.info('Dry run: Skipping summary generation.')
+
+    if item_data["changelog_show"]:
+        file_loader = FileSystemLoader('./templates')
+        env = Environment(loader=file_loader)
+        changelog_html = env.get_template('changelog.html')
+
+        data = {
+            'html_list_items': html_list_items
+        }
+        output = changelog_html.render(data)
+
+        changelog_filename = uuid.uuid4()
+        changelog_html_path = f"changelog/{changelog_filename}.html"
+
+        with open(changelog_html_path, 'w', encoding='utf-8') as html_file:
+            html_file.write(output)
+
+        if s3_uploader and not DRY_RUN:
+            try:
+                s3_uploader.upload(changelog_html_path, s3['bucket_name'], changelog_html_path)
+                logger.info('Changelog uploaded to S3')
+                s3_object_url = f"https://{s3['bucket_access_url']}/{changelog_html_path}"
+            except Exception as e:
+                logger.error(f'Error occurred while uploading changelog to S3: {e}')
+        elif s3_uploader and DRY_RUN:
+            logger.info('Dry run: Skipping changelog upload to S3.')
+
+    return changelog_html_path, s3_object_url, summary_result, True, current_fbx
 
 def send_discord_notification(item_data, product_info, thumb, local_list_name, item_name_list, changelog_html_path, s3_object_url, summary_result):
     """Sends update notification to Discord."""
@@ -270,15 +376,23 @@ def send_discord_notification(item_data, product_info, thumb, local_list_name, i
         else:
             logger.error(f'send_changelog API 요청 실패: {response.text}')
 
-def update_version_file(version_file_path, version_json, item_name_list, download_short_list):
+def update_version_file(version_file_path, version_json, item_name_list, download_short_list, fbx_only=False, new_fbx_records=None):
     """Cleans up and saves the updated version file."""
     if DRY_RUN:
         logger.info(f'Dry run: Skipping version file update for {version_file_path}.')
         return
         
-    cleanup_version_json(version_json['files'])
+    if not fbx_only:
+        cleanup_version_json(version_json['files'])
+    else:
+        version_json['files'] = {}
+
     version_json['name-list'] = item_name_list
     version_json['short-list'] = download_short_list
+    if new_fbx_records is not None:
+        version_json['fbx-files'] = new_fbx_records
+    elif 'fbx-files' not in version_json:
+        version_json['fbx-files'] = {}
     
     with open(version_file_path, 'w') as f:
         simdjson.dump(version_json, fp=f, indent=4)
@@ -300,11 +414,9 @@ def init_update_check(item): # This is the main orchestrator function
     if item_data["name"] is None:
         item_data["name"] = product_name
 
-    version_info = load_and_compare_version(order_num, download_short_list) # This is the new, correct function
-    if not version_info:
+    version_file_path, version_json, download_list_changed = load_and_compare_version(order_num, download_short_list, item_data["fbx_only"])
+    if version_file_path is None and version_json is None and not download_list_changed:
         return
-
-    version_file_path, version_json = version_info
 
     local_list = version_json.get('short-list', [])
     local_list_name = version_json.get('name-list', [])
@@ -312,8 +424,22 @@ def init_update_check(item): # This is the main orchestrator function
     item_name_list = process_files_for_changelog(item_data, download_url_list, local_list) # This is a new helper function
 
     changelog_html_path, s3_object_url, summary_result = None, None, None
-    if item_data["changelog_show"]:
-        changelog_html_path, s3_object_url, summary_result = generate_changelog_and_summary(item_data, download_url_list, version_json)
+    diff_found = download_list_changed
+    new_fbx_records = None
+
+    if item_data["changelog_show"] or item_data["fbx_only"]:
+        changelog_html_path, s3_object_url, summary_result, calc_diff_found, new_fbx_records = generate_changelog_and_summary(
+            item_data, download_url_list, version_json
+        )
+        if item_data["fbx_only"]:
+            diff_found = calc_diff_found
+        elif item_data["changelog_show"]:
+            diff_found = calc_diff_found or diff_found
+
+    if item_data["fbx_only"] and not diff_found:
+        logger.info('FBX contents unchanged. Skipping notification.')
+        update_version_file(version_file_path, version_json, item_name_list, download_short_list, item_data["fbx_only"], new_fbx_records)
+        return
 
     thumb = thumblist[0] if thumblist else "https://asset.booth.pm/assets/thumbnail_placeholder_f_150x150-73e650fbec3b150090cbda36377f1a3402c01e36fa067d01.png"
 
@@ -322,7 +448,7 @@ def init_update_check(item): # This is the main orchestrator function
         item_name_list, changelog_html_path, s3_object_url, summary_result
     )
     
-    update_version_file(version_file_path, version_json, item_name_list, download_short_list)
+    update_version_file(version_file_path, version_json, item_name_list, download_short_list, item_data["fbx_only"], new_fbx_records)
 
 def generate_path_info(root, saved_prehash):
     path_list = []
@@ -364,7 +490,7 @@ def _generate_path_info_recursive(root, saved_prehash, path_list, current_level=
         path_list.append(file_info)
         _generate_path_info_recursive(file_node, saved_prehash, path_list, current_level + 1)
 
-def process_file_tree(input_path, filename, version_json, encoding, current_path):
+def process_file_tree(input_path, filename, version_json, encoding, current_path, fbx_only=False, fbx_records=None):
     current_path.append(filename)
     
     pathstr = '/'.join(current_path)
@@ -386,25 +512,30 @@ def process_file_tree(input_path, filename, version_json, encoding, current_path
         end_file_process(0, process_path)
         return
     
-    node = version_json
-    for part in current_path[:-1]:
-        node = node.setdefault('files', {}).setdefault(part, {}) # Corrected: Removed extra closing parenthesis
-    parent_dict = node.setdefault('files', {})
-    file_node = parent_dict.get(filename)
+    if not fbx_only:
+        node = version_json
+        for part in current_path[:-1]:
+            node = node.setdefault('files', {}).setdefault(part, {})
+        parent_dict = node.setdefault('files', {})
+        file_node = parent_dict.get(filename)
 
-    if file_node is None:
-        parent_dict[filename] = {'hash': filehash, 'mark_as': 1}
-    else:
-        if file_node['hash'] == filehash:
-            file_node['mark_as'] = 0
+        if file_node is None:
+            parent_dict[filename] = {'hash': filehash, 'mark_as': 1}
         else:
-            file_node['hash'] = filehash
-            file_node['mark_as'] = 3
+            if file_node['hash'] == filehash:
+                file_node['mark_as'] = 0
+            else:
+                file_node['hash'] = filehash
+                file_node['mark_as'] = 3
+    else:
+        if not isdir and filename.lower().endswith('.fbx'):
+            if fbx_records is not None:
+                fbx_records[filename] = filehash
         
     if zip_type > 0 or os.path.isdir(process_path):
         for new_filename in os.listdir(process_path):
             new_process_path = os.path.join(process_path, new_filename)
-            process_file_tree(new_process_path, new_filename, version_json, encoding, current_path)
+            process_file_tree(new_process_path, new_filename, version_json, encoding, current_path, fbx_only=fbx_only, fbx_records=fbx_records)
 
     current_path.pop()
     end_file_process(zip_type, process_path)
