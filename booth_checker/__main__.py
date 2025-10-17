@@ -148,10 +148,8 @@ def load_and_compare_version(order_num, download_short_list, fbx_only):
     )
 
     if not has_changed:
-        if not fbx_only:
-            logger.info('nothing has changed.')
-            return None, None, False
-        logger.info('Download list unchanged; checking FBX contents for differences.')
+        logger.info('nothing has changed.')
+        return None, None, False
 
     if not download_short_list:
         logger.error('BOOTH no responding, but change was detected.')
