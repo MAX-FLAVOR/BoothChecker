@@ -5,6 +5,7 @@ class BoothSQLite():
         self.logger = logger
         self.conn = sqlite3.connect(db)
         self.conn.execute("PRAGMA journal_mode=WAL;")
+        self.conn.execute("PRAGMA foreign_keys=ON;")
         self.cursor = self.conn.cursor()
 
         self.cursor.execute('''
