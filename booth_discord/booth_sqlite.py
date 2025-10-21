@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import contextmanager, nullcontext
 
 class BoothSQLite():
     def __init__(self, db, logger):
@@ -7,6 +8,7 @@ class BoothSQLite():
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA foreign_keys=ON;")
         self.cursor = self.conn.cursor()
+        self._transaction_depth = 0
 
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS booth_accounts (
@@ -43,6 +45,21 @@ class BoothSQLite():
 
     def __del__(self):
         self.conn.close()
+
+    @contextmanager
+    def _transaction(self):
+        is_outermost = self._transaction_depth == 0
+        self._transaction_depth += 1
+        try:
+            yield
+            if is_outermost:
+                self.conn.commit()
+        except Exception:
+            if is_outermost:
+                self.conn.rollback()
+            raise
+        finally:
+            self._transaction_depth -= 1
     
     def add_booth_account(self, session_cookie, discord_user_id):
         self.cursor.execute('''
@@ -54,18 +71,18 @@ class BoothSQLite():
             raise Exception("이미 다른 Discord 계정에 등록된 쿠키입니다.")
 
         existing_account = self.get_booth_account(discord_user_id)
-        if existing_account:
-            self.cursor.execute('''
-                UPDATE booth_accounts
-                SET session_cookie = ?
-                WHERE discord_user_id = ?
-            ''', (session_cookie, discord_user_id))
-        else:
-            self.cursor.execute('''
-                INSERT INTO booth_accounts (session_cookie, discord_user_id)
-                VALUES (?, ?)
-            ''', (session_cookie, discord_user_id))
-        self.conn.commit()
+        with self._transaction():
+            if existing_account:
+                self.cursor.execute('''
+                    UPDATE booth_accounts
+                    SET session_cookie = ?
+                    WHERE discord_user_id = ?
+                ''', (session_cookie, discord_user_id))
+            else:
+                self.cursor.execute('''
+                    INSERT INTO booth_accounts (session_cookie, discord_user_id)
+                    VALUES (?, ?)
+                ''', (session_cookie, discord_user_id))
         return self.get_booth_account(discord_user_id)
     
     def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, item_name, intent_encoding,summary_this, fbx_only):
@@ -75,41 +92,38 @@ class BoothSQLite():
         booth_account = self.get_booth_account(discord_user_id)
         if self.is_item_duplicate(booth_item_number, discord_user_id):
             raise Exception("이미 등록된 아이템입니다.")
-        # 서버에 부스 아이템 파일이 남지않도록 하드코딩
-        # download_number_show True, changelog_show True, archive_this False
         if booth_account:
             booth_order_info = get_booth_order_info(booth_item_number, ("_plaza_session_nktz7u", booth_account[0]))
             try:
-                self.cursor.execute('''
-                    INSERT INTO booth_items (
-                                    booth_order_number,
-                                    booth_item_number,
-                                    discord_user_id,
-                                    item_name,
-                                    intent_encoding,
-                                    download_number_show,
-                                    changelog_show,
-                                    archive_this,
-                                    gift_item,
-                                    summary_this,
-                                    fbx_only
-                                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (booth_order_info[1],
-                      booth_item_number,
-                      discord_user_id,
-                      item_name,
-                      intent_encoding,
-                      True,
-                      True,
-                      False,
-                      booth_order_info[0],
-                      summary_this,
-                      fbx_only))
-                self.add_discord_noti_channel(discord_channel_id, booth_order_info[1])
-                self.conn.commit()
+                with self._transaction():
+                    self.cursor.execute('''
+                        INSERT INTO booth_items (
+                                        booth_order_number,
+                                        booth_item_number,
+                                        discord_user_id,
+                                        item_name,
+                                        intent_encoding,
+                                        download_number_show,
+                                        changelog_show,
+                                        archive_this,
+                                        gift_item,
+                                        summary_this,
+                                        fbx_only
+                                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (booth_order_info[1],  # booth_order_number
+                          booth_item_number,
+                          discord_user_id,
+                          item_name,
+                          intent_encoding,
+                          True,                 # download_number_show
+                          True,                 # changelog_show 
+                          False,                # archive_this
+                          booth_order_info[0],  # gift_item
+                          summary_this,
+                          fbx_only))
+                    self.add_discord_noti_channel(discord_channel_id, booth_order_info[1], use_transaction=False)
             except sqlite3.IntegrityError as exc:
-                self.conn.rollback()
                 raise Exception("아이템 등록 중 충돌이 발생했습니다.") from exc
             return booth_order_info[1]
         else:
@@ -127,11 +141,12 @@ class BoothSQLite():
             result = self.cursor.fetchone()
             if result[0] == 1:
                 raise Exception("BOOTH 아이템이 등록되어 있습니다. 먼저 아이템을 삭제해주세요.")
-            self.cursor.execute('''
-                DELETE FROM booth_accounts WHERE discord_user_id = ?
-            ''', (discord_user_id,))
-            self.conn.commit()
-            return self.cursor.rowcount
+            with self._transaction():
+                self.cursor.execute('''
+                    DELETE FROM booth_accounts WHERE discord_user_id = ?
+                ''', (discord_user_id,))
+                deleted_accounts = self.cursor.rowcount
+            return deleted_accounts
         except Exception as e:
             raise Exception(e)
     
@@ -152,18 +167,17 @@ class BoothSQLite():
                 self.logger.debug(f"booth_order_number: {booth_order_number}")
 
                 # 2. booth_items 테이블에서 해당 행을 삭제합니다.
-                self.cursor.execute('''
-                    DELETE FROM booth_items 
-                    WHERE booth_item_number = ? AND discord_user_id = ?
-                ''', (booth_item_number, discord_user_id))
-                deleted_items = self.cursor.rowcount
-                
-                # 3. 조회된 booth_order_number를 사용하여 discord_noti_channels 테이블에서도 삭제합니다.
-                deleted_channels = self.del_discord_noti_channel(booth_order_number)
-                self.conn.commit()
+                with self._transaction():
+                    self.cursor.execute('''
+                        DELETE FROM booth_items 
+                        WHERE booth_item_number = ? AND discord_user_id = ?
+                    ''', (booth_item_number, discord_user_id))
+                    deleted_items = self.cursor.rowcount
+                    
+                    # 3. 조회된 booth_order_number를 사용하여 discord_noti_channels 테이블에서도 삭제합니다.
+                    deleted_channels = self.del_discord_noti_channel(booth_order_number, use_transaction=False)
                 return {'items_deleted': deleted_items, 'channels_deleted': deleted_channels}
             except Exception as e:
-                self.conn.rollback()
                 raise Exception(e)
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
@@ -201,38 +215,42 @@ class BoothSQLite():
         else:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
 
-    def add_discord_noti_channel(self, discord_channel_id, booth_order_number):
-        self.cursor.execute('''
-            SELECT 1 FROM discord_noti_channels
-            WHERE discord_channel_id = ? AND booth_order_number = ?
-        ''', (discord_channel_id, booth_order_number))
-        if self.cursor.fetchone():
-            return False
+    def add_discord_noti_channel(self, discord_channel_id, booth_order_number, use_transaction=True):
+        tx_context = self._transaction() if use_transaction else nullcontext()
+        with tx_context:
+            self.cursor.execute('''
+                SELECT 1 FROM discord_noti_channels
+                WHERE discord_channel_id = ? AND booth_order_number = ?
+            ''', (discord_channel_id, booth_order_number))
+            if self.cursor.fetchone():
+                return False
 
-        self.cursor.execute('''
-            INSERT INTO discord_noti_channels (discord_channel_id, booth_order_number)
-            VALUES (?, ?)
-        ''', (discord_channel_id, booth_order_number))
-        return True
+            self.cursor.execute('''
+                INSERT INTO discord_noti_channels (discord_channel_id, booth_order_number)
+                VALUES (?, ?)
+            ''', (discord_channel_id, booth_order_number))
+            return True
 
-    def del_discord_noti_channel(self, booth_order_number):
+    def del_discord_noti_channel(self, booth_order_number, use_transaction=True):
         self.logger.debug(f"del_discord_noti_channel - booth_order_number : {booth_order_number}") # 추가된 로그
-        self.cursor.execute('''
-            DELETE FROM discord_noti_channels WHERE booth_order_number = ?
-        ''', (booth_order_number,))
-        return self.cursor.rowcount
+        tx_context = self._transaction() if use_transaction else nullcontext()
+        with tx_context:
+            self.cursor.execute('''
+                DELETE FROM discord_noti_channels WHERE booth_order_number = ?
+            ''', (booth_order_number,))
+            return self.cursor.rowcount
 
     def update_discord_noti_channel(self, discord_user_id, discord_channel_id, booth_item_number):
         booth_order_number = self.get_booth_order_number(booth_item_number, discord_user_id)
         if not booth_order_number:
             raise Exception("Item not found")
-        self.cursor.execute('''
-            UPDATE discord_noti_channels
-            SET discord_channel_id = ?
-            WHERE booth_order_number = ?
-        ''', (discord_channel_id, booth_order_number))
-        self.conn.commit()
-        return self.cursor.rowcount
+        with self._transaction():
+            self.cursor.execute('''
+                UPDATE discord_noti_channels
+                SET discord_channel_id = ?
+                WHERE booth_order_number = ?
+            ''', (discord_channel_id, booth_order_number))
+            return self.cursor.rowcount
 
     def get_booth_order_number(self, booth_item_number, discord_user_id):
         self.cursor.execute('''
