@@ -528,7 +528,7 @@ def process_file_tree(input_path, filename, version_json, encoding, current_path
     else:
         if not isdir and filename.lower().endswith('.fbx'):
             if fbx_records is not None:
-                fbx_records[filename] = filehash
+                fbx_records[pathstr] = filehash
         
     if zip_type > 0 or os.path.isdir(process_path):
         for new_filename in os.listdir(process_path):
