@@ -73,7 +73,7 @@ class BoothSQLite():
                                 changelog_show,
                                 archive_this,
                                 gift_item,
-                                summary_this
+                                summary_this,
                                 fbx_only
                                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
