@@ -1,6 +1,7 @@
 # main.py
 import json
 import logging
+import booth as booth_module
 import booth_sqlite
 import booth_discord
 
@@ -21,9 +22,9 @@ def main():
     selenium_url = config_json['selenium_url'] 
 
     # Initialize database and bot
-    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db', logger)
+    booth_crawler = booth_module.BoothCrawler(selenium_url)
+    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db', booth_crawler, logger)
     bot = booth_discord.DiscordBot(booth_db, logger)
-    selumin = booth.BoothCrawler(selenium_url)
     bot.run(discord_bot_token)
 
 if __name__ == "__main__":

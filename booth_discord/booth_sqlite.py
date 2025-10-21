@@ -2,8 +2,9 @@ import sqlite3
 from contextlib import contextmanager, nullcontext
 
 class BoothSQLite():
-    def __init__(self, db, logger):
+    def __init__(self, db, booth, logger):
         self.logger = logger
+        self.booth = booth
         self.conn = sqlite3.connect(db)
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA foreign_keys=ON;")
@@ -86,14 +87,11 @@ class BoothSQLite():
         return self.get_booth_account(discord_user_id)
     
     def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, item_name, intent_encoding,summary_this, fbx_only):
-        # Moved import to be local to avoid dependency issues in booth_checker
-        from booth import get_booth_order_info
-
         booth_account = self.get_booth_account(discord_user_id)
         if self.is_item_duplicate(booth_item_number, discord_user_id):
             raise Exception("이미 등록된 아이템입니다.")
         if booth_account:
-            booth_order_info = get_booth_order_info(booth_item_number, ("_plaza_session_nktz7u", booth_account[0]))
+            booth_order_info = self.booth.get_booth_order_info(booth_item_number, ("_plaza_session_nktz7u", booth_account[0]))
             try:
                 with self._transaction():
                     self.cursor.execute('''
@@ -166,16 +164,14 @@ class BoothSQLite():
                 booth_order_number = result[0]
                 self.logger.debug(f"booth_order_number: {booth_order_number}")
 
-                # 2. booth_items 테이블에서 해당 행을 삭제합니다.
+                # 2. 조회된 booth_order_number를 사용하여 discord_noti_channels 테이블에서 먼저 삭제합니다.
                 with self._transaction():
+                    deleted_channels = self.del_discord_noti_channel(booth_order_number, use_transaction=False)
                     self.cursor.execute('''
                         DELETE FROM booth_items 
                         WHERE booth_item_number = ? AND discord_user_id = ?
                     ''', (booth_item_number, discord_user_id))
                     deleted_items = self.cursor.rowcount
-                    
-                    # 3. 조회된 booth_order_number를 사용하여 discord_noti_channels 테이블에서도 삭제합니다.
-                    deleted_channels = self.del_discord_noti_channel(booth_order_number, use_transaction=False)
                 return {'items_deleted': deleted_items, 'channels_deleted': deleted_channels}
             except Exception as e:
                 raise Exception(e)

@@ -38,13 +38,13 @@ class BoothCrawler():
                 raise Exception("상품이 존재하지 않거나, 구매하지 않은 상품입니다.")
             
             order_page = product_div.find("a").get("href")
-            order_parse = parse_url(order_page)
+            order_parse = self.parse_url(order_page)
             return order_parse
         
         finally:
             driver.quit()
 
-    def parse_url(url):
+    def parse_url(self, url):
         # 정규식 정의
         pattern = r"https://(?:accounts\.)?booth\.pm/(orders|gifts)/([\w-]+)"
         match = re.match(pattern, url)
