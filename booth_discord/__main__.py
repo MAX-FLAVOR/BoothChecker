@@ -12,12 +12,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def main():
-    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db', logger)
-    bot = booth_discord.DiscordBot(booth_db, logger)
+    # Load configuration
     with open("config.json") as file:
         config_json = json.load(file)
+    
+    # Read configuration values
     discord_bot_token = config_json['discord_bot_token']
-    selenium_url = config_json['selenium_url']  
+    selenium_url = config_json['selenium_url'] 
+
+    # Initialize database and bot
+    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db', logger)
+    bot = booth_discord.DiscordBot(booth_db, logger)
+    selumin = booth.BoothCrawler(selenium_url)
     bot.run(discord_bot_token)
 
 if __name__ == "__main__":
