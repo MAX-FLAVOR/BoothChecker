@@ -17,6 +17,7 @@ def main():
     with open("config.json") as file:
         config_json = json.load(file)
     discord_bot_token = config_json['discord_bot_token']
+    selenium_url = config_json['selenium_url']  
     bot.run(discord_bot_token)
 
 if __name__ == "__main__":
