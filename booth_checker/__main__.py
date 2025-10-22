@@ -819,7 +819,8 @@ if __name__ == "__main__":
     createFolder("./download")
     createFolder("./process")
 
-    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db')
+    postgres_config = dict(config_json['postgres'])
+    booth_db = booth_sqlite.BoothSQLite(postgres_config)
 
     if not DRY_RUN:
         # booth_discord 컨테이너 시작 대기

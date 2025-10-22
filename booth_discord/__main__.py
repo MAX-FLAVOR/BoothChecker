@@ -23,7 +23,8 @@ def main():
 
     # Initialize database and bot
     booth_crawler = booth_module.BoothCrawler(selenium_url)
-    booth_db = booth_sqlite.BoothSQLite('./version/db/booth.db', booth_crawler, logger)
+    postgres_config = dict(config_json['postgres'])
+    booth_db = booth_sqlite.BoothSQLite(postgres_config, booth_crawler, logger)
     bot = booth_discord.DiscordBot(booth_db, logger)
     bot.run(discord_bot_token)
 
