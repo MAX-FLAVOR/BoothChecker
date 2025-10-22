@@ -18,7 +18,7 @@ from unitypackage_extractor.extractor import extractPackage
 
 from shared import *
 import booth
-import booth_sqlite
+import booth_sql
 import cloudflare
 import llm_summary
 
@@ -820,7 +820,7 @@ if __name__ == "__main__":
     createFolder("./process")
 
     postgres_config = dict(config_json['postgres'])
-    booth_db = booth_sqlite.BoothSQLite(postgres_config)
+    booth_db = booth_sql.BoothPostgres(postgres_config)
 
     if not DRY_RUN:
         # booth_discord 컨테이너 시작 대기

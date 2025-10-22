@@ -2,7 +2,7 @@
 import json
 import logging
 import booth as booth_module
-import booth_sqlite
+import booth_sql
 import booth_discord
 
 logging.basicConfig(
@@ -24,7 +24,7 @@ def main():
     # Initialize database and bot
     booth_crawler = booth_module.BoothCrawler(selenium_url)
     postgres_config = dict(config_json['postgres'])
-    booth_db = booth_sqlite.BoothSQLite(postgres_config, booth_crawler, logger)
+    booth_db = booth_sql.BoothPostgres(postgres_config, booth_crawler, logger)
     bot = booth_discord.DiscordBot(booth_db, logger)
     bot.run(discord_bot_token)
 
