@@ -60,6 +60,3 @@ class BoothPostgres:
                     exc,
                 )
                 time.sleep(delay)
-
-
-BoothSQLite = BoothPostgres

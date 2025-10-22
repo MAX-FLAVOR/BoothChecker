@@ -282,6 +282,3 @@ class BoothPostgres:
         self.cursor.execute('SELECT COUNT(*) FROM booth_items WHERE discord_user_id = %s', (discord_user_id,))
         result = self.cursor.fetchone()
         return result[0] if result else 0
-
-
-BoothSQLite = BoothPostgres
