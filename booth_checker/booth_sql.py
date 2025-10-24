@@ -3,7 +3,7 @@ import time
 import psycopg
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('BoothChecker')
 
 
 class BoothPostgres:

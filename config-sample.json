@@ -1,6 +1,13 @@
 {
     "dry_run": false,
     "refresh_interval": 600,
+    "logging": {
+        "syslog": {
+            "enabled": false,
+            "address": "",
+            "port": 5141
+        }
+    },
     "selenium_url": "http://localhost:4444/wd/hub",
     "postgres": {
         "host": "postgres",
