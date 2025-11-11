@@ -45,6 +45,7 @@ class DiscordBot(commands.Bot):
         @self.tree.command(name="item_add", description="BOOTH 아이템 등록")
         @app_commands.describe(item_number="BOOTH 상품 번호를 입력 해주세요")
         @app_commands.describe(item_name="아이템 이름을 입력 해주세요")
+        @app_commands.describe(order_number="수동으로 주문 번호를 입력해야 할 때에 사용")
         @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요 (기본값: shift_jis)")
         @app_commands.describe(summary_this="업데이트 내용 요약 (기본값: True)")
         @app_commands.describe(fbx_only="FBX 변경점만 확인 (기본값: False)")
@@ -52,6 +53,7 @@ class DiscordBot(commands.Bot):
             interaction: discord.Interaction,
             item_number: str,
             item_name: str = None,
+            order_number: str = None,
             intent_encoding: str = "shift_jis",
             summary_this: bool = True,
             fbx_only: bool = False
@@ -62,6 +64,7 @@ class DiscordBot(commands.Bot):
                     interaction.user.id,
                     interaction.channel_id,
                     item_number,
+                    order_number,
                     item_name,
                     intent_encoding,
                     summary_this,

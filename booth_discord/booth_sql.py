@@ -100,14 +100,18 @@ class BoothPostgres:
                 ''', (session_cookie, discord_user_id))
         return self.get_booth_account(discord_user_id)
 
-    def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, item_name, intent_encoding, summary_this, fbx_only):
+    def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, booth_order_number, item_name, intent_encoding, summary_this, fbx_only):
         booth_account = self.get_booth_account(discord_user_id)
         if self.is_item_duplicate(booth_item_number, discord_user_id):
             raise Exception("이미 등록된 아이템입니다.")
         if not booth_account:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
 
-        booth_order_info = self.booth.get_booth_order_info(booth_item_number, ("_plaza_session_nktz7u", booth_account[0]))
+        if booth_order_number:
+            booth_order_info = (False, booth_order_number)
+        else:
+            booth_order_info = self.booth.get_booth_order_info(booth_item_number, ("_plaza_session_nktz7u", booth_account[0]))
+        
         try:
             with self._transaction() as cursor:
                 cursor.execute('''
