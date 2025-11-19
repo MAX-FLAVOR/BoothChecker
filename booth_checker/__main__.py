@@ -269,17 +269,33 @@ def generate_fbx_changelog_and_summary(item_data, download_url_list, version_jso
             logger.error(f'An error occurred while parsing {filename}: {e}')
             logger.debug(traceback.format_exc())
 
+    previous_hashes = {file_hash for file_hash in previous_fbx.values()}
+    current_hashes = {file_hash for file_hash in current_fbx.values()}
+
     added = []
     changed = []
+    deleted = []
 
-    for name, new_hash in current_fbx.items():
-        old_hash = previous_fbx.get(name)
-        if old_hash is None:
-            added.append(name)
-        elif old_hash != new_hash:
+    previous_remaining = dict(previous_fbx)
+    current_remaining = dict(current_fbx)
+
+    for name in set(previous_fbx.keys()) & set(current_fbx.keys()):
+        old_hash = previous_fbx[name]
+        new_hash = current_fbx[name]
+        if old_hash != new_hash:
             changed.append(name)
+        previous_remaining.pop(name, None)
+        current_remaining.pop(name, None)
 
-    deleted = [name for name in previous_fbx.keys() if name not in current_fbx]
+    for name, new_hash in current_remaining.items():
+        if new_hash in previous_hashes:
+            continue
+        added.append(name)
+
+    for name, old_hash in previous_remaining.items():
+        if old_hash in current_hashes:
+            continue
+        deleted.append(name)
 
     if not added and not changed and not deleted:
         logger.info('No FBX hash differences detected; skipping changelog generation.')
