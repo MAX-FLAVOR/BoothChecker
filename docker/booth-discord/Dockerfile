@@ -3,6 +3,7 @@ ENV TZ=Asia/Seoul
 RUN apt-get update && apt-get upgrade -y
 WORKDIR /root/boothchecker
 COPY ./booth_discord ./
+COPY ./logging_setup.py ./logging_setup.py
 COPY ./docker/booth-discord/requirements.txt ./
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt

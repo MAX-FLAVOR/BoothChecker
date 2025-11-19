@@ -1,6 +1,21 @@
 {
     "dry_run": false,
     "refresh_interval": 600,
+    "logging": {
+        "syslog": {
+            "enabled": false,
+            "address": "",
+            "port": 5141
+        }
+    },
+    "selenium_url": "http://localhost:4444/wd/hub",
+    "postgres": {
+        "host": "postgres",
+        "port": 5432,
+        "dbname": "booth",
+        "user": "booth_user",
+        "password": "booth_password"
+    },
     "discord_api_url": "http://booth-discord:5000",
     "discord_bot_token": "",
     "gemini_api_key": "",

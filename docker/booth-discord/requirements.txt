@@ -3,3 +3,4 @@ pytz
 quart
 selenium
 beautifulsoup4
+psycopg[binary]

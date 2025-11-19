@@ -3,6 +3,7 @@ ENV TZ=Asia/Seoul
 RUN apt-get update && apt-get upgrade -y
 WORKDIR /root/boothchecker
 COPY ./booth_checker ./
+COPY ./logging_setup.py ./logging_setup.py
 COPY ./templates ./templates
 COPY ./docker/booth-checker/requirements.txt ./
 RUN pip install --upgrade pip
