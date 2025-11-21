@@ -37,6 +37,7 @@ def main():
     # Read configuration values
     discord_bot_token = config_json['discord_bot_token']
     selenium_url = config_json['selenium_url'] 
+    fbx_only = config_json['fbx_only']
 
     # Initialize database and bot
     booth_crawler = booth_module.BoothCrawler(selenium_url)
