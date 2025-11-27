@@ -43,7 +43,7 @@ def main():
     booth_crawler = booth_module.BoothCrawler(selenium_url)
     postgres_config = dict(config_json['postgres'])
     booth_db = booth_sql.BoothPostgres(postgres_config, booth_crawler, logger)
-    bot = booth_discord.DiscordBot(booth_db, logger)
+    bot = booth_discord.DiscordBot(booth_db, logger, fbx_only)
     bot.run(discord_bot_token)
 
 if __name__ == "__main__":
