@@ -1,15 +1,6 @@
 {
-    "dry_run": false,
     "refresh_interval": 600,
-    "fbx_only": false,
-    "logging": {
-        "syslog": {
-            "enabled": false,
-            "address": "",
-            "port": 5141
-        }
-    },
-    "selenium_url": "http://localhost:4444/wd/hub",
+    "selenium_url": "http://chrome:4444/wd/hub",
     "postgres": {
         "host": "postgres",
         "port": 5432,
@@ -18,14 +9,14 @@
         "password": "booth_password"
     },
     "discord_api_url": "http://booth-discord:5000",
-    "discord_bot_token": "",
-    "gemini_api_key": "",
+    "discord_bot_token": "YOUR_DISCORD_BOT_TOKEN",
+    "gemini_api_key": "YOUR_GEMINI_API_KEY",
     "s3":
         {
-            "endpoint_url": "",
-            "bucket_name": "",
-            "bucket_access_url": "",
-            "access_key_id": "",
-            "secret_access_key": ""
+            "endpoint_url": "YOUR_S3_ENDPOINT_URL",
+            "bucket_name": "YOUR_S3_BUCKET_NAME",
+            "bucket_access_url": "YOUR_S3_BUCKET_ACCESS_URL",
+            "access_key_id": "YOUR_S3_ACCESS_KEY_ID",
+            "secret_access_key": "YOUR_S3_SECRET_ACCESS_KEY"
         }
 }
