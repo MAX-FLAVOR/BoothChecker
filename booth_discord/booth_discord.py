@@ -7,12 +7,13 @@ from quart import Quart, request, jsonify
 import asyncio
 
 class DiscordBot(commands.Bot):
-    def __init__(self, booth_db, logger, *args, **kwargs):
+    def __init__(self, booth_db, logger, fbx_only, *args, **kwargs):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(command_prefix="/", intents=intents, *args, **kwargs)
         self.booth_db = booth_db
         self.logger = logger
+        self.fbx_only = fbx_only
         self.embed_message = None  # on_ready에서 초기화 예정
         self.app = Quart(__name__)  # Quart 앱 초기화
         self.setup_commands()
@@ -48,7 +49,7 @@ class DiscordBot(commands.Bot):
         @app_commands.describe(order_number="수동으로 주문 번호를 입력해야 할 때에 사용")
         @app_commands.describe(intent_encoding="아이템 이름의 인코딩 방식을 입력해주세요 (기본값: shift_jis)")
         @app_commands.describe(summary_this="업데이트 내용 요약 (기본값: True)")
-        @app_commands.describe(fbx_only="FBX 변경점만 확인 (기본값: False)")
+        @app_commands.describe(fbx_only=f'FBX 변경점만 확인 (기본값: {str(self.fbx_only)})')
         async def item_add(
             interaction: discord.Interaction,
             item_number: str,
@@ -56,7 +57,7 @@ class DiscordBot(commands.Bot):
             order_number: str = None,
             intent_encoding: str = "shift_jis",
             summary_this: bool = True,
-            fbx_only: bool = False
+            fbx_only: bool = self.fbx_only
         ):
             try:
                 await interaction.response.defer(ephemeral=True)

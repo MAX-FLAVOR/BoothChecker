@@ -37,12 +37,13 @@ def main():
     # Read configuration values
     discord_bot_token = config_json['discord_bot_token']
     selenium_url = config_json['selenium_url'] 
+    fbx_only = config_json['fbx_only']
 
     # Initialize database and bot
     booth_crawler = booth_module.BoothCrawler(selenium_url)
     postgres_config = dict(config_json['postgres'])
     booth_db = booth_sql.BoothPostgres(postgres_config, booth_crawler, logger)
-    bot = booth_discord.DiscordBot(booth_db, logger)
+    bot = booth_discord.DiscordBot(booth_db, logger, fbx_only)
     bot.run(discord_bot_token)
 
 if __name__ == "__main__":

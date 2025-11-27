@@ -1,6 +1,7 @@
 {
     "dry_run": false,
     "refresh_interval": 600,
+    "fbx_only": false,
     "logging": {
         "syslog": {
             "enabled": false,
