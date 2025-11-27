@@ -1,7 +1,7 @@
 # BoothChecker
 
 [![latest](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/latest-build.yml/badge.svg)](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/latest-build.yml)
-[![dev](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/dev-build.yml/badge.svg)](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/dev-build.yml)
+[![develop](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/develop-build.yml/badge.svg)](https://github.com/MAX-FLAVOR/BoothChecker/actions/workflows/develop-build.yml)
 
 ***
 ### Docker-Compose
