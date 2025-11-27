@@ -1,6 +1,6 @@
 services:
   booth-checker:
-    image: ogunarmaya/booth-checker:latest
+    image: ghcr.io/max-flavor/booth-checker:latest
     volumes:
       - ./version:/root/boothchecker/version
       - ./archive:/root/boothchecker/archive
@@ -16,7 +16,7 @@ services:
         max-file: "3"
       
   booth-discord:
-    image: ogunarmaya/booth-discord:latest
+    image: ghcr.io/max-flavor/booth-discord:latest
     volumes:
       - ./version:/root/boothchecker/version
       - ./changelog:/root/boothchecker/changelog
@@ -30,11 +30,28 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  chrome:
-    image: selenium/standalone-chrome:latest
+  postgres:
+    image: postgres:18.0
     restart: unless-stopped
+    environment:
+      POSTGRES_DB: booth
+      POSTGRES_USER: booth_user
+      POSTGRES_PASSWORD: booth_password
+    ports:
+      5433:5432
+    volumes:
+      postgres-data:/var/lib/postgresql
     logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+  chrome:
+  image: selenium/standalone-chrome:latest
+  restart: unless-stopped
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
