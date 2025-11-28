@@ -9,7 +9,7 @@ def _extract_download_info(div, link_selector, filename_selector):
     if not download_link or not filename_div:
         return None
 
-    href = download_link.get("href")
+    href = download_link.get("data-href")
     filename = filename_div.get_text()
 
     if not href:
@@ -72,8 +72,8 @@ def crawling(order_num, product_only, cookie, shortlist=None, thumblist=None):
         'product_info_selector': 'a',
         'product_info_index': 1,
         'thumb_selector': 'img',
-        'download_item_selector': 'div.legacy-list-item__center',
-        'download_link_selector': 'a.nav-reverse',
+        'download_item_selector': 'div.legacy-list-item__center, div[data-test="downloadable"]',
+        'download_link_selector': 'a.nav-reverse, div.js-download-button',
         'filename_selector': 'div.flex-\\[1\\] b'
     }
     return _crawling_base(url, cookie, selectors, shortlist, thumblist, product_only_filter=product_only)
@@ -85,8 +85,8 @@ def crawling_gift(order_num, cookie, shortlist=None, thumblist=None):
         'product_div_class': 'rounded-16 bg-white p-40 mobile:px-16 mobile:pt-24 mobile:pb-40 mobile:rounded-none',
         'product_info_selector': 'div.mt-24.text-left a',
         'thumb_selector': 'img',
-        'download_item_selector': 'div.w-full.text-left',
-        'download_link_selector': 'a.no-underline.flex.items-center.flex.gap-4',
+        'download_item_selector': 'div.w-full.text-left, div[data-test="downloadable"]',
+        'download_link_selector': 'a.no-underline.flex.items-center.flex.gap-4, div.js-download-button',
         'filename_selector': "div[class='min-w-0 break-words whitespace-pre-line']"
     }
     return _crawling_base(url, cookie, selectors, shortlist, thumblist)
