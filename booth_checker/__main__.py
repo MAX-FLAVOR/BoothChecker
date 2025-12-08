@@ -874,15 +874,6 @@ if __name__ == "__main__":
     while True:
         logger.info("BoothChecker cycle started")
 
-        # BOOTH Heartbeat check once per cycle
-        try:
-            logger.info('Checking BOOTH heartbeat')
-            requests.get("https://booth.pm", timeout=10)
-        except requests.RequestException as e:
-            logger.error(f'BOOTH heartbeat failed: {e}. Skipping this cycle.')
-            sleep(refresh_interval)
-            continue
-
         # Recreate temporary folders
         recreate_folder("./download")
         recreate_folder("./process")
