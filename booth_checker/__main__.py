@@ -849,8 +849,8 @@ if __name__ == "__main__":
     createFolder("./download")
     createFolder("./process")
 
-    postgres_config = dict(config_json['postgres'])
-    booth_db = booth_sql.BoothPostgres(postgres_config)
+    dynamodb_config = dict(config_json['dynamodb'])
+    booth_db = booth_sql.BoothDynamoDB(dynamodb_config)
 
     if not DRY_RUN:
         # booth_discord 컨테이너 시작 대기

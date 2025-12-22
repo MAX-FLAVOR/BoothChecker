@@ -1,106 +1,151 @@
 import time
-from contextlib import contextmanager
+from decimal import Decimal
 
-import psycopg
-from psycopg import errors as pg_errors
+import boto3
+from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 
 
-class BoothPostgres:
-    def __init__(self, conn_params, booth, logger):
+def _to_decimal(value):
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def _to_int(value):
+    if isinstance(value, Decimal):
+        return int(value)
+    return value
+
+
+class BoothDynamoDB:
+    def __init__(self, config, booth, logger):
         self.logger = logger
         self.booth = booth
-        self.conn = self._connect_with_retry(conn_params)
-        self.conn.autocommit = True
+        self.config = config
+        self.dynamodb = self._connect_with_retry(config)
+        self._ensure_tables()
+        tables = config['tables']
+        self.accounts_table = self.dynamodb.Table(tables['accounts'])
+        self.items_table = self.dynamodb.Table(tables['items'])
+        self.channels_table = self.dynamodb.Table(tables['channels'])
 
-        with self.conn.transaction():
-            with self.conn.cursor() as cursor:
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS booth_accounts (
-                        session_cookie TEXT UNIQUE,
-                        discord_user_id BIGINT PRIMARY KEY
-                    )
-                ''')
-
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS booth_items (
-                        booth_order_number TEXT PRIMARY KEY,
-                        booth_item_number TEXT,
-                        discord_user_id BIGINT,
-                        item_name TEXT,
-                        intent_encoding TEXT,
-                        download_number_show BOOLEAN,
-                        changelog_show BOOLEAN,
-                        archive_this BOOLEAN,
-                        gift_item BOOLEAN,
-                        summary_this BOOLEAN,
-                        fbx_only BOOLEAN,
-                        FOREIGN KEY(discord_user_id) REFERENCES booth_accounts(discord_user_id)
-                    )
-                ''')
-
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS discord_noti_channels (
-                        discord_channel_id BIGINT,
-                        booth_order_number TEXT,
-                        UNIQUE(discord_channel_id, booth_order_number),
-                        FOREIGN KEY(booth_order_number) REFERENCES booth_items(booth_order_number)
-                    )
-                ''')
-
-    def __del__(self):
-        try:
-            self.conn.close()
-        except Exception:
-            pass
-
-    def _connect_with_retry(self, conn_params, retries=5, delay=2):
+    def _connect_with_retry(self, config, retries=5, delay=2):
         for attempt in range(1, retries + 1):
             try:
-                return psycopg.connect(**conn_params)
-            except psycopg.OperationalError as exc:
+                return boto3.resource(
+                    'dynamodb',
+                    region_name=config.get('region'),
+                    endpoint_url=config.get('endpoint_url'),
+                )
+            except ClientError as exc:
                 if attempt == retries:
-                    self.logger.error("PostgreSQL 연결에 실패했습니다. 설정을 확인해주세요.")
+                    self.logger.error("DynamoDB 연결에 실패했습니다. 설정을 확인해주세요.")
                     raise
                 self.logger.warning(
-                    "PostgreSQL 연결 재시도 %s/%s: %s",
+                    "DynamoDB 연결 재시도 %s/%s: %s",
                     attempt,
                     retries,
                     exc,
                 )
                 time.sleep(delay)
 
-    @contextmanager
-    def _transaction(self):
-        with self.conn.transaction():
-            with self.conn.cursor() as cursor:
-                yield cursor
+    def _ensure_tables(self):
+        table_names = self.config['tables']
+        client = self.dynamodb.meta.client
+        existing = set(client.list_tables().get('TableNames', []))
+
+        if table_names['accounts'] not in existing:
+            client.create_table(
+                TableName=table_names['accounts'],
+                AttributeDefinitions=[
+                    {'AttributeName': 'discord_user_id', 'AttributeType': 'N'},
+                    {'AttributeName': 'session_cookie', 'AttributeType': 'S'},
+                ],
+                KeySchema=[{'AttributeName': 'discord_user_id', 'KeyType': 'HASH'}],
+                BillingMode='PAY_PER_REQUEST',
+                GlobalSecondaryIndexes=[
+                    {
+                        'IndexName': 'session_cookie-index',
+                        'KeySchema': [{'AttributeName': 'session_cookie', 'KeyType': 'HASH'}],
+                        'Projection': {'ProjectionType': 'ALL'},
+                    }
+                ],
+            )
+            client.get_waiter('table_exists').wait(TableName=table_names['accounts'])
+
+        if table_names['items'] not in existing:
+            client.create_table(
+                TableName=table_names['items'],
+                AttributeDefinitions=[
+                    {'AttributeName': 'booth_order_number', 'AttributeType': 'S'},
+                    {'AttributeName': 'discord_user_id', 'AttributeType': 'N'},
+                    {'AttributeName': 'booth_item_number', 'AttributeType': 'S'},
+                ],
+                KeySchema=[{'AttributeName': 'booth_order_number', 'KeyType': 'HASH'}],
+                BillingMode='PAY_PER_REQUEST',
+                GlobalSecondaryIndexes=[
+                    {
+                        'IndexName': 'discord_user_id-booth_item_number-index',
+                        'KeySchema': [
+                            {'AttributeName': 'discord_user_id', 'KeyType': 'HASH'},
+                            {'AttributeName': 'booth_item_number', 'KeyType': 'RANGE'},
+                        ],
+                        'Projection': {'ProjectionType': 'ALL'},
+                    }
+                ],
+            )
+            client.get_waiter('table_exists').wait(TableName=table_names['items'])
+
+        if table_names['channels'] not in existing:
+            client.create_table(
+                TableName=table_names['channels'],
+                AttributeDefinitions=[
+                    {'AttributeName': 'booth_order_number', 'AttributeType': 'S'},
+                    {'AttributeName': 'discord_channel_id', 'AttributeType': 'N'},
+                ],
+                KeySchema=[
+                    {'AttributeName': 'booth_order_number', 'KeyType': 'HASH'},
+                    {'AttributeName': 'discord_channel_id', 'KeyType': 'RANGE'},
+                ],
+                BillingMode='PAY_PER_REQUEST',
+                GlobalSecondaryIndexes=[
+                    {
+                        'IndexName': 'discord_channel_id-index',
+                        'KeySchema': [
+                            {'AttributeName': 'discord_channel_id', 'KeyType': 'HASH'},
+                            {'AttributeName': 'booth_order_number', 'KeyType': 'RANGE'},
+                        ],
+                        'Projection': {'ProjectionType': 'ALL'},
+                    }
+                ],
+            )
+            client.get_waiter('table_exists').wait(TableName=table_names['channels'])
 
     def add_booth_account(self, session_cookie, discord_user_id):
-        with self.conn.cursor() as cursor:
-            cursor.execute('''
-                SELECT discord_user_id FROM booth_accounts
-                WHERE session_cookie = %s
-            ''', (session_cookie,))
-            owner = cursor.fetchone()
-        if owner and owner[0] != discord_user_id:
+        existing_owner = self._find_account_by_cookie(session_cookie)
+        if existing_owner and existing_owner != discord_user_id:
             raise Exception("이미 다른 Discord 계정에 등록된 쿠키입니다.")
 
-        existing_account = self.get_booth_account(discord_user_id)
-        with self._transaction() as cursor:
-            if existing_account:
-                cursor.execute('''
-                    UPDATE booth_accounts
-                    SET session_cookie = %s
-                    WHERE discord_user_id = %s
-                ''', (session_cookie, discord_user_id))
-            else:
-                cursor.execute('''
-                    INSERT INTO booth_accounts (session_cookie, discord_user_id)
-                    VALUES (%s, %s)
-                ''', (session_cookie, discord_user_id))
+        self.accounts_table.put_item(
+            Item={
+                'discord_user_id': _to_decimal(discord_user_id),
+                'session_cookie': session_cookie,
+            }
+        )
         return self.get_booth_account(discord_user_id)
 
-    def add_booth_item(self, discord_user_id, discord_channel_id, booth_item_number, booth_order_number, item_name, intent_encoding, summary_this, fbx_only):
+    def add_booth_item(
+        self,
+        discord_user_id,
+        discord_channel_id,
+        booth_item_number,
+        booth_order_number,
+        item_name,
+        intent_encoding,
+        summary_this,
+        fbx_only,
+    ):
         booth_account = self.get_booth_account(discord_user_id)
         if self.is_item_duplicate(booth_item_number, discord_user_id):
             raise Exception("이미 등록된 아이템입니다.")
@@ -110,195 +155,179 @@ class BoothPostgres:
         if booth_order_number:
             booth_order_info = (False, booth_order_number)
         else:
-            booth_order_info = self.booth.get_booth_order_info(booth_item_number, ("_plaza_session_nktz7u", booth_account[0]))
-        
+            booth_order_info = self.booth.get_booth_order_info(
+                booth_item_number,
+                ("_plaza_session_nktz7u", booth_account[0]),
+            )
+
         try:
-            with self._transaction() as cursor:
-                cursor.execute('''
-                    INSERT INTO booth_items (
-                                    booth_order_number,
-                                    booth_item_number,
-                                    discord_user_id,
-                                    item_name,
-                                    intent_encoding,
-                                    download_number_show,
-                                    changelog_show,
-                                    archive_this,
-                                    gift_item,
-                                    summary_this,
-                                    fbx_only
-                                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ''', (booth_order_info[1],  # booth_order_number
-                      booth_item_number,
-                      discord_user_id,
-                      item_name,
-                      intent_encoding,
-                      True,                 # download_number_show
-                      True,                 # changelog_show
-                      False,                # archive_this
-                      booth_order_info[0],  # gift_item
-                      summary_this,
-                      fbx_only))
-                self.add_discord_noti_channel(
-                    discord_channel_id,
-                    booth_order_info[1],
-                    use_transaction=False,
-                    cursor=cursor,
-                )
-        except pg_errors.IntegrityError as exc:
-            raise Exception("아이템 등록 중 충돌이 발생했습니다.") from exc
+            self.items_table.put_item(
+                Item={
+                    'booth_order_number': booth_order_info[1],
+                    'booth_item_number': booth_item_number,
+                    'discord_user_id': _to_decimal(discord_user_id),
+                    'item_name': item_name,
+                    'intent_encoding': intent_encoding,
+                    'download_number_show': True,
+                    'changelog_show': True,
+                    'archive_this': False,
+                    'gift_item': booth_order_info[0],
+                    'summary_this': summary_this,
+                    'fbx_only': fbx_only,
+                },
+                ConditionExpression='attribute_not_exists(booth_order_number)',
+            )
+            self.add_discord_noti_channel(
+                discord_channel_id,
+                booth_order_info[1],
+                use_transaction=False,
+            )
+        except ClientError as exc:
+            if exc.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                raise Exception("아이템 등록 중 충돌이 발생했습니다.") from exc
+            raise
+
         return booth_order_info[1]
 
     def del_booth_account(self, discord_user_id):
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute('''
-                    SELECT EXISTS (
-                        SELECT 1
-                        FROM booth_items
-                        WHERE discord_user_id = %s
-                    );
-                ''', (discord_user_id,))
-                result = cursor.fetchone()
-            if result[0] == 1:
-                raise Exception("BOOTH 아이템이 등록되어 있습니다. 먼저 아이템을 삭제해주세요.")
-            with self._transaction() as cursor:
-                cursor.execute('''
-                    DELETE FROM booth_accounts WHERE discord_user_id = %s
-                ''', (discord_user_id,))
-                return cursor.rowcount
-        except Exception as exc:
-            raise Exception(exc)
+        if self.get_booth_item_count(discord_user_id) > 0:
+            raise Exception("BOOTH 아이템이 등록되어 있습니다. 먼저 아이템을 삭제해주세요.")
+        response = self.accounts_table.delete_item(
+            Key={'discord_user_id': _to_decimal(discord_user_id)},
+            ReturnValues='ALL_OLD',
+        )
+        return 1 if 'Attributes' in response else 0
 
     def del_booth_item(self, discord_user_id, booth_item_number):
         booth_account = self.get_booth_account(discord_user_id)
         if not booth_account:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
 
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute('''
-                    SELECT booth_order_number FROM booth_items
-                    WHERE booth_item_number = %s AND discord_user_id = %s
-                ''', (booth_item_number, discord_user_id))
-                result = cursor.fetchone()
-            if not result:
-                raise Exception(f"Item {booth_item_number} not found for user {discord_user_id}")
+        booth_order_number = self.get_booth_order_number(booth_item_number, discord_user_id)
+        if not booth_order_number:
+            raise Exception(f"Item {booth_item_number} not found for user {discord_user_id}")
 
-            booth_order_number = result[0]
-            self.logger.debug("booth_order_number: %s", booth_order_number)
-
-            with self._transaction() as cursor:
-                deleted_channels = self.del_discord_noti_channel(
-                    booth_order_number,
-                    use_transaction=False,
-                    cursor=cursor,
-                )
-                cursor.execute('''
-                    DELETE FROM booth_items
-                    WHERE booth_item_number = %s AND discord_user_id = %s
-                ''', (booth_item_number, discord_user_id))
-                deleted_items = cursor.rowcount
-            return {'items_deleted': deleted_items, 'channels_deleted': deleted_channels}
-        except Exception as exc:
-            raise Exception(exc)
+        deleted_channels = self.del_discord_noti_channel(booth_order_number, use_transaction=False)
+        response = self.items_table.delete_item(
+            Key={'booth_order_number': booth_order_number},
+            ReturnValues='ALL_OLD',
+        )
+        deleted_items = 1 if 'Attributes' in response else 0
+        return {'items_deleted': deleted_items, 'channels_deleted': deleted_channels}
 
     def get_booth_account(self, discord_user_id):
-        with self.conn.cursor() as cursor:
-            cursor.execute('''
-                SELECT * FROM booth_accounts
-                WHERE discord_user_id = %s
-            ''', (discord_user_id,))
-            result = cursor.fetchone()
-        return result if result else None
+        response = self.accounts_table.get_item(
+            Key={'discord_user_id': _to_decimal(discord_user_id)}
+        )
+        item = response.get('Item')
+        if not item:
+            return None
+        return (item.get('session_cookie'), _to_int(item.get('discord_user_id')))
 
     def is_item_duplicate(self, booth_item_number, discord_user_id):
-        with self.conn.cursor() as cursor:
-            cursor.execute('''
-                SELECT 1 FROM booth_items
-                WHERE booth_item_number = %s AND discord_user_id = %s
-            ''', (booth_item_number, discord_user_id))
-            return cursor.fetchone() is not None
+        response = self.items_table.query(
+            IndexName='discord_user_id-booth_item_number-index',
+            KeyConditionExpression=
+                Key('discord_user_id').eq(_to_decimal(discord_user_id))
+                & Key('booth_item_number').eq(booth_item_number),
+        )
+        return response.get('Count', 0) > 0
 
     def list_booth_items(self, discord_user_id, discord_channel_id):
         booth_account = self.get_booth_account(discord_user_id)
         if not booth_account:
             raise Exception("BOOTH 계정이 등록되어 있지 않습니다.")
 
-        with self.conn.cursor() as cursor:
-            cursor.execute('''
-                SELECT bi.booth_item_number
-                FROM booth_items bi
-                JOIN discord_noti_channels dnc
-                ON bi.booth_order_number = dnc.booth_order_number
-                WHERE bi.discord_user_id = %s
-                AND dnc.discord_channel_id = %s;
-            ''', (discord_user_id, discord_channel_id))
-            return cursor.fetchall()
+        response = self.channels_table.query(
+            IndexName='discord_channel_id-index',
+            KeyConditionExpression=Key('discord_channel_id').eq(_to_decimal(discord_channel_id)),
+        )
+        booth_order_numbers = [item['booth_order_number'] for item in response.get('Items', [])]
+        if not booth_order_numbers:
+            return []
+
+        results = []
+        for booth_order_number in booth_order_numbers:
+            item_response = self.items_table.get_item(Key={'booth_order_number': booth_order_number})
+            booth_item = item_response.get('Item')
+            if booth_item and _to_int(booth_item.get('discord_user_id')) == discord_user_id:
+                results.append((booth_item.get('booth_item_number'),))
+        return results
 
     def add_discord_noti_channel(self, discord_channel_id, booth_order_number, use_transaction=True, cursor=None):
-        if cursor is not None:
-            return self._insert_discord_noti_channel(cursor, discord_channel_id, booth_order_number)
-        if use_transaction:
-            with self._transaction() as tx_cursor:
-                return self._insert_discord_noti_channel(tx_cursor, discord_channel_id, booth_order_number)
-        with self.conn.cursor() as standalone_cursor:
-            return self._insert_discord_noti_channel(standalone_cursor, discord_channel_id, booth_order_number)
+        return self._insert_discord_noti_channel(discord_channel_id, booth_order_number)
 
     def del_discord_noti_channel(self, booth_order_number, use_transaction=True, cursor=None):
         self.logger.debug("del_discord_noti_channel - booth_order_number : %s", booth_order_number)
-        if cursor is not None:
-            return self._delete_discord_noti_channel(cursor, booth_order_number)
-        if use_transaction:
-            with self._transaction() as tx_cursor:
-                return self._delete_discord_noti_channel(tx_cursor, booth_order_number)
-        with self.conn.cursor() as standalone_cursor:
-            return self._delete_discord_noti_channel(standalone_cursor, booth_order_number)
+        return self._delete_discord_noti_channel(booth_order_number)
 
     def update_discord_noti_channel(self, discord_user_id, discord_channel_id, booth_item_number):
         booth_order_number = self.get_booth_order_number(booth_item_number, discord_user_id)
         if not booth_order_number:
             raise Exception("Item not found")
-        with self._transaction() as cursor:
-            cursor.execute('''
-                UPDATE discord_noti_channels
-                SET discord_channel_id = %s
-                WHERE booth_order_number = %s
-            ''', (discord_channel_id, booth_order_number))
-            return cursor.rowcount
+        deleted = self._delete_discord_noti_channel(booth_order_number)
+        self._insert_discord_noti_channel(discord_channel_id, booth_order_number)
+        return max(deleted, 1)
 
     def get_booth_order_number(self, booth_item_number, discord_user_id):
-        with self.conn.cursor() as cursor:
-            cursor.execute('''
-                SELECT booth_order_number FROM booth_items
-                WHERE booth_item_number = %s AND discord_user_id = %s
-            ''', (booth_item_number, discord_user_id))
-            result = cursor.fetchone()
-        return result[0] if result else None
-    
+        response = self.items_table.query(
+            IndexName='discord_user_id-booth_item_number-index',
+            KeyConditionExpression=
+                Key('discord_user_id').eq(_to_decimal(discord_user_id))
+                & Key('booth_item_number').eq(booth_item_number),
+        )
+        items = response.get('Items', [])
+        return items[0]['booth_order_number'] if items else None
+
     def get_booth_item_count(self, discord_user_id):
-        with self.conn.cursor() as cursor:
-            cursor.execute('SELECT COUNT(*) FROM booth_items WHERE discord_user_id = %s', (discord_user_id,))
-            result = cursor.fetchone()
-        return result[0] if result else 0
+        response = self.items_table.query(
+            IndexName='discord_user_id-booth_item_number-index',
+            KeyConditionExpression=Key('discord_user_id').eq(_to_decimal(discord_user_id)),
+            Select='COUNT',
+        )
+        return response.get('Count', 0)
 
-    def _insert_discord_noti_channel(self, cursor, discord_channel_id, booth_order_number):
-        cursor.execute('''
-            SELECT 1 FROM discord_noti_channels
-            WHERE discord_channel_id = %s AND booth_order_number = %s
-        ''', (discord_channel_id, booth_order_number))
-        if cursor.fetchone():
-            return False
+    def _insert_discord_noti_channel(self, discord_channel_id, booth_order_number):
+        try:
+            self.channels_table.put_item(
+                Item={
+                    'booth_order_number': booth_order_number,
+                    'discord_channel_id': _to_decimal(discord_channel_id),
+                },
+                ConditionExpression=(
+                    'attribute_not_exists(booth_order_number) '
+                    'AND attribute_not_exists(discord_channel_id)'
+                ),
+            )
+            return True
+        except ClientError as exc:
+            if exc.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                return False
+            raise
 
-        cursor.execute('''
-            INSERT INTO discord_noti_channels (discord_channel_id, booth_order_number)
-            VALUES (%s, %s)
-        ''', (discord_channel_id, booth_order_number))
-        return True
+    def _delete_discord_noti_channel(self, booth_order_number):
+        response = self.channels_table.query(
+            KeyConditionExpression=Key('booth_order_number').eq(booth_order_number)
+        )
+        items = response.get('Items', [])
+        if not items:
+            return 0
+        with self.channels_table.batch_writer() as batch:
+            for item in items:
+                batch.delete_item(
+                    Key={
+                        'booth_order_number': item['booth_order_number'],
+                        'discord_channel_id': item['discord_channel_id'],
+                    }
+                )
+        return len(items)
 
-    def _delete_discord_noti_channel(self, cursor, booth_order_number):
-        cursor.execute('''
-            DELETE FROM discord_noti_channels WHERE booth_order_number = %s
-        ''', (booth_order_number,))
-        return cursor.rowcount
+    def _find_account_by_cookie(self, session_cookie):
+        response = self.accounts_table.query(
+            IndexName='session_cookie-index',
+            KeyConditionExpression=Key('session_cookie').eq(session_cookie),
+        )
+        items = response.get('Items', [])
+        if not items:
+            return None
+        return _to_int(items[0].get('discord_user_id'))

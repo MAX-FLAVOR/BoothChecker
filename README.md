@@ -13,12 +13,14 @@ BOOTH.pm의 아이템 업데이트를 주기적으로 확인하고 업데이트 
 {
     "refresh_interval": 600,
     "selenium_url": "http://chrome:4444/wd/hub",
-    "postgres": {
-        "host": "postgres",
-        "port": 5432,
-        "dbname": "booth",
-        "user": "booth_user",
-        "password": "booth_password"
+    "dynamodb": {
+        "region": "ap-northeast-2",
+        "endpoint_url": "https://dynamodb.ap-northeast-2.amazonaws.com",
+        "tables": {
+            "accounts": "booth_accounts",
+            "items": "booth_items",
+            "channels": "discord_noti_channels"
+        }
     },
     "discord_api_url": "http://booth-discord:5000",
     "discord_bot_token": "YOUR_DISCORD_BOT_TOKEN",
