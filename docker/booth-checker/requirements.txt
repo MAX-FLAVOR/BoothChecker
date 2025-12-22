@@ -7,4 +7,3 @@ pytz
 boto3
 jinja2
 google-genai
-psycopg[binary]

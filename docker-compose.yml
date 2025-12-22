@@ -30,23 +30,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  postgres:
-    image: postgres:18.1
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: booth
-      POSTGRES_USER: booth_user
-      POSTGRES_PASSWORD: booth_password
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres-data:/var/lib/postgresql
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
   chrome:
     image: selenium/standalone-chrome:latest
     restart: unless-stopped
@@ -55,6 +38,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  postgres-data:
