@@ -779,6 +779,19 @@ def recreate_folder(path):
         shutil.rmtree(path)
     os.makedirs(path)
 
+def booth_heartbeat_ok(url="https://booth.pm/"):
+    try:
+        response = requests.get(url, timeout=10)
+    except requests.RequestException as exc:
+        logger.error(f'BOOTH heartbeat request failed: {exc}. Skipping this cycle.')
+        return False
+
+    if response.status_code != 200:
+        logger.error(f'BOOTH heartbeat failed: status={response.status_code}. Skipping this cycle.')
+        return False
+
+    return True
+
 def run_update_check_safely(item):
     thread_local.order_num = item[0]
     try:
@@ -873,6 +886,11 @@ if __name__ == "__main__":
 
     while True:
         logger.info("BoothChecker cycle started")
+
+        if not booth_heartbeat_ok():
+            logger.info(f"Next check will be at {datetime.now() + timedelta(seconds=refresh_interval)}")
+            sleep(refresh_interval)
+            continue
 
         # Recreate temporary folders
         recreate_folder("./download")
