@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from bs4 import BeautifulSoup
 
 class BoothCrawler():
@@ -11,6 +12,8 @@ class BoothCrawler():
         self.selenium_url = selenium_url
 
     def get_booth_order_info(self, item_number, cookie):
+        wait_timeout_seconds = 30
+
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--disable-gpu")
@@ -26,28 +29,37 @@ class BoothCrawler():
         driver.refresh()
 
         try:
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "flex.desktop\\:flex-row.mobile\\:flex-col"))
+            WebDriverWait(driver, wait_timeout_seconds).until(
+                EC.presence_of_element_located(
+                    (
+                        By.CSS_SELECTOR,
+                        "#js-item-order a[href*='/orders/'], #js-item-gift a[href*='/gifts/']"
+                    )
+                )
             )
 
             html = driver.page_source
             soup = BeautifulSoup(html, "html.parser")
-            
-            product_div = soup.find("div", class_="flex desktop:flex-row mobile:flex-col")
-            if not product_div:
-                raise Exception("상품이 존재하지 않거나, 구매하지 않은 상품입니다.")
-            
-            order_page = product_div.find("a").get("href")
-            order_parse = self.parse_url(order_page)
+
+            # Prefer direct purchase order when both order/gift sections are present.
+            order_link = soup.select_one("#js-item-order a[href*='/orders/']")
+            if order_link is None:
+                order_link = soup.select_one("#js-item-gift a[href*='/gifts/']")
+            if order_link is None:
+                raise Exception("주문/기프트 링크를 찾지 못했습니다. 쿠키 만료 또는 미구매 상품일 수 있습니다.")
+
+            order_parse = self.parse_url(order_link.get("href", ""))
             return order_parse
-        
+        except TimeoutException as exc:
+            raise Exception(
+                f"페이지 로딩이 지연되어 주문 정보를 찾지 못했습니다. ({wait_timeout_seconds}초 대기)"
+            ) from exc
         finally:
             driver.quit()
 
     def parse_url(self, url):
-        # 정규식 정의
-        pattern = r"https://(?:accounts\.)?booth\.pm/(orders|gifts)/([\w-]+)"
-        match = re.match(pattern, url)
+        pattern = r"(?:https://(?:accounts\.)?booth\.pm)?/(orders|gifts)/([\w-]+)"
+        match = re.search(pattern, url)
         
         if match:
             gift_flag = match.group(1) == "gifts"  # gifts이면 True, orders이면 False
