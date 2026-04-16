@@ -8,7 +8,6 @@ import re
 import uuid
 import logging
 import threading
-from collections import defaultdict
 from datetime import datetime, timedelta
 from time import sleep
 from concurrent.futures import ThreadPoolExecutor
@@ -16,6 +15,11 @@ from jinja2 import Environment, FileSystemLoader
 
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
+
+try:
+    from .fbx_diff import build_fbx_path_list, calculate_fbx_diff
+except ImportError:
+    from fbx_diff import build_fbx_path_list, calculate_fbx_diff
 
 from shared import *
 import booth
@@ -255,81 +259,6 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
 
     return changelog_html_path, s3_object_url, summary_result, diff_found, None
 
-
-def _normalize_fbx_entries(fbx_records):
-    entries = []
-    for path_str, file_hash in fbx_records.items():
-        entries.append({'basename': os.path.basename(path_str), 'hash': file_hash})
-    return entries
-
-
-def _calculate_fbx_diff_by_name_hash(previous_fbx, current_fbx):
-    previous_entries = _normalize_fbx_entries(previous_fbx)
-    current_entries = _normalize_fbx_entries(current_fbx)
-
-    previous_by_key = defaultdict(list)
-    current_by_key = defaultdict(list)
-    for entry in previous_entries:
-        previous_by_key[(entry['basename'], entry['hash'])].append(entry)
-    for entry in current_entries:
-        current_by_key[(entry['basename'], entry['hash'])].append(entry)
-
-    remaining_previous = []
-    for key, entries in previous_by_key.items():
-        current_matches = current_by_key.get(key, [])
-        match_count = min(len(entries), len(current_matches))
-        if match_count < len(entries):
-            remaining_previous.extend(entries[match_count:])
-        if match_count < len(current_matches):
-            current_by_key[key] = current_matches[match_count:]
-        else:
-            current_by_key[key] = []
-
-    remaining_current = []
-    for entries in current_by_key.values():
-        remaining_current.extend(entries)
-
-    previous_by_name = defaultdict(list)
-    current_by_name = defaultdict(list)
-    for entry in remaining_previous:
-        previous_by_name[entry['basename']].append(entry)
-    for entry in remaining_current:
-        current_by_name[entry['basename']].append(entry)
-
-    added = []
-    changed = []
-    deleted = []
-
-    for name in sorted(set(previous_by_name) | set(current_by_name)):
-        previous_list = sorted(previous_by_name.get(name, []), key=lambda e: e['hash'])
-        current_list = sorted(current_by_name.get(name, []), key=lambda e: e['hash'])
-        if previous_list and current_list:
-            change_count = min(len(previous_list), len(current_list))
-            changed.extend(current_list[:change_count])
-            added.extend(current_list[change_count:])
-            deleted.extend(previous_list[change_count:])
-        elif current_list:
-            added.extend(current_list)
-        elif previous_list:
-            deleted.extend(previous_list)
-
-    return added, changed, deleted
-
-
-def _format_fbx_display_names(entries, used_name_counts):
-    names = []
-    for entry in sorted(entries, key=lambda e: (e['basename'], e['hash'])):
-        base = entry['basename']
-        index = used_name_counts.get(base, 0)
-        if index == 0:
-            display_name = base
-        else:
-            display_name = f'{base}({index})'
-        used_name_counts[base] = index + 1
-        names.append(display_name)
-    return names
-
-
 def generate_fbx_changelog_and_summary(item_data, download_url_list, version_json):
     """Generates changelog information for FBX-only tracking."""
     previous_fbx = version_json.get('fbx-files', {}) or {}
@@ -344,21 +273,13 @@ def generate_fbx_changelog_and_summary(item_data, download_url_list, version_jso
             logger.error(f'An error occurred while parsing {filename}: {e}')
             logger.debug(traceback.format_exc())
 
-    added_entries, changed_entries, deleted_entries = _calculate_fbx_diff_by_name_hash(previous_fbx, current_fbx)
+    added_entries, changed_entries, deleted_entries = calculate_fbx_diff(previous_fbx, current_fbx)
 
     if not added_entries and not changed_entries and not deleted_entries:
         logger.info('No FBX hash differences detected; skipping changelog generation.')
         return None, None, None, False, current_fbx
 
-    path_list = []
-    used_name_counts = {}
-    for name in _format_fbx_display_names(added_entries, used_name_counts):
-        path_list.append({'line_str': name, 'status': 1})
-    for name in _format_fbx_display_names(changed_entries, used_name_counts):
-        path_list.append({'line_str': name, 'status': 3})
-    for name in _format_fbx_display_names(deleted_entries, used_name_counts):
-        path_list.append({'line_str': name, 'status': 2})
-
+    path_list = build_fbx_path_list(added_entries, changed_entries, deleted_entries)
     tree = build_tree(path_list)
     html_list_items = tree_to_html(tree) if item_data["changelog_show"] else ''
     summary_data = files_list(tree)
