@@ -9,14 +9,17 @@ def _extract_download_info(div, link_selector, filename_selector):
     if not download_link or not filename_div:
         return None
 
-    href = download_link.get("data-href")
-    filename = filename_div.get_text()
+    href = download_link.get("data-href") or download_link.get("href")
+    filename = filename_div.get_text(strip=True)
 
-    if not href:
+    if not href or not filename:
         return None
 
-    href = re.sub(r'[^0-9]', '', href)
-    return [href, filename]
+    match = re.search(r'/downloadables/(\d+)', href)
+    if not match:
+        return None
+
+    return [match.group(1), filename]
 
 def _crawling_base(url, cookie, selectors, shortlist, thumblist, product_only_filter=None):
     response = requests.get(url=url, cookies=cookie)
@@ -72,9 +75,19 @@ def crawling(order_num, product_only, cookie, shortlist=None, thumblist=None):
         'product_info_selector': 'a',
         'product_info_index': 1,
         'thumb_selector': 'img',
-        'download_item_selector': 'div.legacy-list-item__center, div[data-test="downloadable"]',
-        'download_link_selector': 'a.nav-reverse, div.js-download-button',
-        'filename_selector': 'div.flex-\\[1\\] b'
+        'download_item_selector': (
+            'div.legacy-list-item__center, '
+            'div.mt-16.desktop\\:flex.desktop\\:justify-between.desktop\\:items-center'
+        ),
+        'download_link_selector': (
+            'div.js-download-button[data-test="downloadable"][data-href*="/downloadables/"], '
+            'a.nav-reverse[href*="/downloadables/"]'
+        ),
+        'filename_selector': (
+            'div.min-w-0.u-text-wrap b, '
+            'div.min-w-0.break-words.whitespace-pre-line, '
+            'div.flex-\\[1\\] b'
+        )
     }
     return _crawling_base(url, cookie, selectors, shortlist, thumblist, product_only_filter=product_only)
 
@@ -85,9 +98,9 @@ def crawling_gift(order_num, cookie, shortlist=None, thumblist=None):
         'product_div_class': 'rounded-16 bg-white p-40 mobile:px-16 mobile:pt-24 mobile:pb-40 mobile:rounded-none',
         'product_info_selector': 'div.mt-24.text-left a',
         'thumb_selector': 'img',
-        'download_item_selector': 'div.w-full.text-left, div[data-test="downloadable"]',
-        'download_link_selector': 'a.no-underline.flex.items-center.flex.gap-4, div.js-download-button',
-        'filename_selector': "div[class='min-w-0 break-words whitespace-pre-line']"
+        'download_item_selector': 'div.mt-16.desktop\\:flex.desktop\\:justify-between.desktop\\:items-center',
+        'download_link_selector': 'div.js-download-button[data-test="downloadable"][data-href*="/downloadables/"]',
+        'filename_selector': 'div.min-w-0.break-words.whitespace-pre-line, div.min-w-0.u-text-wrap b'
     }
     return _crawling_base(url, cookie, selectors, shortlist, thumblist)
 

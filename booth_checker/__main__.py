@@ -16,6 +16,11 @@ from jinja2 import Environment, FileSystemLoader
 from operator import length_hint
 from unitypackage_extractor.extractor import extractPackage
 
+try:
+    from .fbx_diff import build_fbx_path_list, calculate_fbx_diff
+except ImportError:
+    from fbx_diff import build_fbx_path_list, calculate_fbx_diff
+
 from shared import *
 import booth
 import booth_sql
@@ -254,7 +259,6 @@ def generate_changelog_and_summary(item_data, download_url_list, version_json):
 
     return changelog_html_path, s3_object_url, summary_result, diff_found, None
 
-
 def generate_fbx_changelog_and_summary(item_data, download_url_list, version_json):
     """Generates changelog information for FBX-only tracking."""
     previous_fbx = version_json.get('fbx-files', {}) or {}
@@ -269,46 +273,13 @@ def generate_fbx_changelog_and_summary(item_data, download_url_list, version_jso
             logger.error(f'An error occurred while parsing {filename}: {e}')
             logger.debug(traceback.format_exc())
 
-    previous_hashes = {file_hash for file_hash in previous_fbx.values()}
-    current_hashes = {file_hash for file_hash in current_fbx.values()}
+    added_entries, changed_entries, deleted_entries = calculate_fbx_diff(previous_fbx, current_fbx)
 
-    added = []
-    changed = []
-    deleted = []
-
-    previous_remaining = dict(previous_fbx)
-    current_remaining = dict(current_fbx)
-
-    for name in set(previous_fbx.keys()) & set(current_fbx.keys()):
-        old_hash = previous_fbx[name]
-        new_hash = current_fbx[name]
-        if old_hash != new_hash:
-            changed.append(name)
-        previous_remaining.pop(name, None)
-        current_remaining.pop(name, None)
-
-    for name, new_hash in current_remaining.items():
-        if new_hash in previous_hashes:
-            continue
-        added.append(name)
-
-    for name, old_hash in previous_remaining.items():
-        if old_hash in current_hashes:
-            continue
-        deleted.append(name)
-
-    if not added and not changed and not deleted:
+    if not added_entries and not changed_entries and not deleted_entries:
         logger.info('No FBX hash differences detected; skipping changelog generation.')
         return None, None, None, False, current_fbx
 
-    path_list = []
-    for name in sorted(added):
-        path_list.append({'line_str': name, 'status': 1})
-    for name in sorted(changed):
-        path_list.append({'line_str': name, 'status': 3})
-    for name in sorted(deleted):
-        path_list.append({'line_str': name, 'status': 2})
-
+    path_list = build_fbx_path_list(added_entries, changed_entries, deleted_entries)
     tree = build_tree(path_list)
     html_list_items = tree_to_html(tree) if item_data["changelog_show"] else ''
     summary_data = files_list(tree)
@@ -873,15 +844,6 @@ if __name__ == "__main__":
 
     while True:
         logger.info("BoothChecker cycle started")
-
-        # BOOTH Heartbeat check once per cycle
-        try:
-            logger.info('Checking BOOTH heartbeat')
-            requests.get("https://booth.pm", timeout=10)
-        except requests.RequestException as e:
-            logger.error(f'BOOTH heartbeat failed: {e}. Skipping this cycle.')
-            sleep(refresh_interval)
-            continue
 
         # Recreate temporary folders
         recreate_folder("./download")
